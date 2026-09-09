@@ -70,9 +70,51 @@
     margin: 0 auto;
     padding-top: calc(20px + env(safe-area-inset-top));
     padding-right: calc(16px + env(safe-area-inset-right));
-    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
     padding-left: calc(16px + env(safe-area-inset-left));
   }
+
+  /* ---------------- bottom tab bar ---------------- */
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding: 6px calc(4px + env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) calc(4px + env(safe-area-inset-right));
+  }
+  .tabbar button {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--muted);
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.1px;
+    padding: 6px 2px 4px;
+  }
+  .tabbar button.active { color: var(--accent); }
+  .tabbar svg { width: 22px; height: 22px; }
+
+  /* ---------------- chips (metric / range pickers) ---------------- */
+  .chiprow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip {
+    padding: 7px 13px; border-radius: 20px;
+    background: var(--panel2); border: 1px solid var(--line);
+    color: var(--muted); font-size: 13px; font-weight: 600;
+  }
+  .chip.active { background: var(--accent); color: var(--ink); border-color: var(--accent); }
+  .chip.sm { padding: 5px 11px; font-size: 12px; font-weight: 500; }
+
+  /* ---------------- readout under the big chart ---------------- */
+  .readout {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding-top: 10px; margin-top: 6px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  .readout b { color: var(--text); font-size: 17px; font-weight: 700; }
+
+  /* ---------------- inline sparklines on the home tiles ---------------- */
+  .tile { position: relative; }
+  .tile.has-spark .tile-label { padding-right: 68px; }
+  .tile-spark { position: absolute; top: 14px; right: 15px; width: 62px; height: 22px; }
+  .spark { display: block; width: 100%; height: 100%; overflow: visible; }
 
   h1.title { font-size: 34px; font-weight: 700; letter-spacing: -0.8px; line-height: 1.05; margin: 0; }
   h2.title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; margin: 0; }
@@ -917,8 +959,43 @@ function stepper(id, value, min, max, big) {
     "</div>";
 }
 
+const TABS = [
+  { key: "home", label: "Home", page: "home",
+    icon: 'M3 11.2 12 4l9 7.2M5.5 9.8V20h13V9.8' },
+  { key: "log", label: "Log", page: "sessions",
+    icon: 'M6.5 3.5h8l3 3V20.5h-11zM8.5 9h7M8.5 12.5h7M8.5 16h4' },
+  { key: "trends", label: "Trends", page: "trends",
+    icon: 'M4 20V10M9.5 20V6M15 20v-8M20 20V4' },
+  { key: "body", label: "Body", page: "body",
+    icon: 'M12 3.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6ZM6 20.5v-4a4.5 4.5 0 0 1 4.5-4.5h3A4.5 4.5 0 0 1 18 16.5v4' },
+  { key: "setup", label: "Setup", page: "settings",
+    icon: 'M12 8.7a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6ZM12 2.5v2.4M12 19.1v2.4M4.9 5l1.7 1.7M17.4 17.3l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19l1.7-1.7M17.4 6.7l1.7-1.7' },
+];
+
+/** Which tab, if any, this page belongs under. A deep page like the
+ *  exercise screen keeps its own back arrow and still shows the bar, but
+ *  highlights the tab it was reached from rather than nothing at all. */
+function activeTabKey() {
+  const p = view.page;
+  if (p === "home") return "home";
+  if (p === "sessions" || p === "session" || p === "exercise") return "log";
+  if (p === "trends") return "trends";
+  if (p === "body") return "body";
+  if (p === "settings" || p === "pins") return "setup";
+  return null;
+}
+
+function tabBar() {
+  const active = activeTabKey();
+  return '<nav class="tabbar">' + TABS.map((t) =>
+    '<button class="' + (active === t.key ? "active" : "") + '" onclick="go({page:\'' + t.page + '\'})" aria-label="' + esc(t.label) + '">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' + t.icon + '"/></svg>' +
+      "<span>" + esc(t.label) + "</span></button>"
+  ).join("") + "</nav>";
+}
+
 function shell(inner) {
-  document.getElementById("app").innerHTML = '<div class="wrap">' + inner + "</div>";
+  document.getElementById("app").innerHTML = '<div class="wrap">' + inner + "</div>" + tabBar();
 }
 
 /* ----------------------------------------------------------------
@@ -950,6 +1027,7 @@ function render() {
   if (view.page === "pb") return renderPB();
   if (view.page === "log") return renderLog();
   if (view.page === "sync") return renderSync();
+  if (view.page === "trends") return renderTrends();
   if (view.page === "body") return renderBody();
   if (view.page === "whoop") return renderWhoop();
   if (view.page === "settings") return renderSettings();
@@ -1893,6 +1971,25 @@ function whoopStats(days) {
    text so nothing clips on a narrow phone.
 ================================================================= */
 
+/** A minimal trend line for inside a tile: no axes, no labels, spaced by
+ *  point order rather than true dates, since a tile has room to say
+ *  "trending up", not to be read precisely. */
+function sparkline(pts, color) {
+  if (!pts || pts.length < 2) return "";
+  const w = 62, h = 22, pad = 2;
+  const ys = pts.map((p) => p.y);
+  let y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  if (y1 === y0) { y0 -= 1; y1 += 1; }
+  const X = (i) => pad + (i / (pts.length - 1)) * (w - pad * 2);
+  const Y = (v) => pad + (1 - (v - y0) / (y1 - y0)) * (h - pad * 2);
+  const d = pts.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.y).toFixed(1)).join(" ");
+  const last = pts[pts.length - 1];
+  return '<svg class="spark" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" role="img" aria-hidden="true">' +
+    '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="' + X(pts.length - 1).toFixed(1) + '" cy="' + Y(last.y).toFixed(1) + '" r="2" fill="' + color + '"/>' +
+    "</svg>";
+}
+
 /**
  * Wraps a chart in its panel, or explains why there is no chart yet. Every
  * trend needs at least two points, and hiding the panel entirely when there
@@ -1960,6 +2057,16 @@ function lineChart(series, o) {
       g += '<circle cx="' + X(last.x).toFixed(1) + '" cy="' + Y(last.y).toFixed(1) + '" r="3.2" fill="' + s.c + '"/>';
     }
     if (pts.length === 1) g += '<circle cx="' + X(pts[0].x).toFixed(1) + '" cy="' + Y(pts[0].y).toFixed(1) + '" r="3.2" fill="' + s.c + '"/>';
+
+    /* Tap-to-read, primary series only. The circle drawn for the line is
+       too small to hit reliably with a thumb, so an invisible one sits on
+       top of it, wide enough to tap without the reader ever seeing it. */
+    if (o.pickKey && s === series[0]) {
+      pts.forEach((p) => {
+        g += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="13" fill="transparent" style="cursor:pointer" ' +
+          'data-key="' + esc(o.pickKey) + '" data-x="' + esc(p.x) + '" data-y="' + p.y + '" onclick="pickTrend(this)"></circle>';
+      });
+    }
   });
 
   const sortedAll = all.slice().sort((a, b) => a.x.localeCompare(b.x));
@@ -2187,6 +2294,159 @@ function stdRow(mg, r) {
     "</div>";
 }
 
+
+/* ================================================================
+   TRENDS PAGE
+
+   Five small stacked charts on the dashboard were each too cramped to
+   read and, together, a lot of scrolling for not much insight. One big
+   chart with a metric switcher and a range picker replaces them: the
+   reader picks what to look at, sees it drawn properly, and can tap a
+   point to read its exact date and value.
+================================================================= */
+
+const TREND_RANGES = [
+  { key: "3m", label: "3M", days: 90 },
+  { key: "6m", label: "6M", days: 183 },
+  { key: "1y", label: "1Y", days: 366 },
+  { key: "all", label: "All", days: Infinity },
+];
+
+/* Which metric and range are on screen, and the last point tapped in
+   each metric. Module-level rather than on `view` so switching pages
+   and coming back to Trends leaves it where it was. */
+let trendMetric = "progress";
+let trendRange = "6m";
+let trendPick = {};
+
+function setTrendMetric(k) { trendMetric = k; render(); }
+window.setTrendMetric = setTrendMetric;
+function setTrendRange(k) { trendRange = k; render(); }
+window.setTrendRange = setTrendRange;
+
+/** A tapped chart point, read off its data- attributes and filed under
+ *  the metric that was on screen when it was tapped. */
+function pickTrend(el) {
+  const k = el.getAttribute("data-key");
+  trendPick[k] = { x: el.getAttribute("data-x"), y: parseFloat(el.getAttribute("data-y")) };
+  render();
+}
+window.pickTrend = pickTrend;
+
+/** The single-series metrics. Each is worked out fresh on every render,
+ *  which is cheap here and keeps this page never out of date. */
+function trendMetrics() {
+  const hist = history();
+  const uncal = PROGRAMME.filter((e) => e.unit === "pin" && pinToKg(e, 1) == null).length;
+  return {
+    progress: {
+      label: "Progress", c: "var(--pb)", area: true,
+      pts: hist.map((p) => ({ x: p.date, y: p.idx - 100 })),
+      fmt: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v)) + "%",
+      ref: 0, refLabel: "start",
+      explain: "Every lift against the load it started on, averaged per group. Each point uses the eight weeks up to that week, so a deload shows up honestly rather than being smoothed away. No standards tables or conversions in this one, so it is the number to trust.",
+      waiting: "Log a second week of sets and this fills in.",
+    },
+    strength: {
+      label: "Strength", c: "var(--accent)", area: true, yMin: 0,
+      pts: hist.filter((p) => p.std != null).map((p) => ({ x: p.date, y: p.std })),
+      fmt: (v) => Math.round(v) + "/100",
+      ref: 50, refLabel: "intermediate",
+      explain: "Best lift in each group, read against bodyweight standards: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average.",
+      waiting: "Needs a bodyweight entry plus a barbell or dumbbell lift logged in two different weeks.",
+    },
+    bodyweight: {
+      label: "Bodyweight", c: "var(--mg-legs)", area: true,
+      pts: bwSorted().map((r) => ({ x: r.date, y: r.kg })),
+      fmt: (v) => n1(v) + "kg",
+      explain: "First thing, after the loo, before food, is the comparison that holds.",
+      waiting: "Weigh in twice and the line appears.",
+    },
+    ratio: {
+      label: "Str : BW", c: "var(--mg-shoulders)", area: false,
+      pts: hist.filter((p) => p.ratio != null).map((p) => ({ x: p.date, y: p.ratio })),
+      fmt: (v) => n1(v) + "×",
+      explain: "The five anchor lifts added up, over bodyweight. The one number a bulk cannot flatter: it rises only if the lifts move faster than the scale.",
+      waiting: "Needs bodyweight plus scoreable lifts in two different weeks.",
+    },
+    tonnage: {
+      label: "Tonnage", c: "var(--mg-chest)", area: true,
+      pts: weekBuckets(104).filter((b) => b.vol > 0).map((b) => ({ x: b.week, y: b.vol / 1000 })),
+      fmt: (v) => n1(v) + "t",
+      explain: "Load × reps, per week. Kilo lifts always, plus any cable machine whose stack you have measured" +
+        (uncal > 0 ? "; " + uncal + " machine(s) are still unmeasured, so their work is missing from this line" : "") +
+        ". Answers how much work, not how heavy.",
+      waiting: "Needs sets logged in two different weeks.",
+    },
+  };
+}
+
+function renderTrends() {
+  const metrics = trendMetrics();
+  const rangeDef = TREND_RANGES.filter((r) => r.key === trendRange)[0] || TREND_RANGES[1];
+
+  let out = '<div style="margin-bottom:18px"><h1 class="title">Trends</h1>' +
+    '<div class="lede">How the numbers move, not just where they stand.</div></div>';
+
+  out += '<div class="chiprow">' + Object.keys(metrics).map((k) =>
+    '<button class="chip' + (trendMetric === k ? " active" : "") + '" onclick="setTrendMetric(\'' + k + '\')">' + esc(metrics[k].label) + "</button>"
+  ).join("") +
+    '<button class="chip' + (trendMetric === "groups" ? " active" : "") + '" onclick="setTrendMetric(\'groups\')">By group</button></div>';
+
+  out += '<div class="chiprow">' + TREND_RANGES.map((r) =>
+    '<button class="chip sm' + (trendRange === r.key ? " active" : "") + '" onclick="setTrendRange(\'' + r.key + '\')">' + esc(r.label) + "</button>"
+  ).join("") + "</div>";
+
+  if (trendMetric === "groups") {
+    const hist = history();
+    const gseries = MG_ORDER.map((mg) => ({
+      pts: hist.filter((p) => p.gi[mg].idx != null && daysBetween(p.date, today()) <= rangeDef.days)
+        .map((p) => ({ x: p.date, y: p.gi[mg].idx - 100 })),
+      c: MG[mg].c, w: 1.8, dots: false,
+    })).filter((s) => s.pts.length >= 2);
+    out += '<div class="panel">';
+    if (gseries.length) {
+      out += lineChart(gseries, { ref: 0, refLabel: "start", h: 220, fmt: (v) => (v > 0 ? "+" : "") + Math.round(v) + "%" }) +
+        '<div class="legend">' + MG_ORDER.map((mg) => '<span><i style="background:' + MG[mg].c + '"></i>' + esc(MG[mg].label) + "</span>").join("") + "</div>";
+    } else {
+      out += '<div class="body-copy">Needs at least two muscle groups with two logged weeks each in this range.</div>';
+    }
+    out += '<div class="hint" style="margin-top:12px">Every group’s progress line side by side, so you can see whether one is dragging behind the others rather than reading five separate charts to find out.</div></div>';
+  } else {
+    const m = metrics[trendMetric];
+    const pts = m.pts.filter((p) => daysBetween(p.x, today()) <= rangeDef.days);
+    out += '<div class="panel">';
+    if (pts.length >= 2) {
+      out += lineChart([{ pts: pts, c: m.c, area: m.area }],
+        { ref: m.ref, refLabel: m.refLabel, h: 220, yMin: m.yMin, fmt: m.fmt, pickKey: trendMetric });
+      const remembered = trendPick[trendMetric];
+      const pick = remembered && pts.some((p) => p.x === remembered.x) ? remembered : pts[pts.length - 1];
+      out += '<div class="readout"><span>' + esc(fmtDay(pick.x)) + "</span><b>" + esc(m.fmt(pick.y)) + "</b></div>";
+    } else {
+      out += '<div class="body-copy">' + esc(
+        pts.length === 1 && m.pts.length >= 2
+          ? "Only one point falls inside " + rangeDef.label + ". Widen the range, or " + m.waiting.charAt(0).toLowerCase() + m.waiting.slice(1)
+          : m.waiting
+      ) + "</div>";
+    }
+    out += '<div class="hint" style="margin-top:12px">' + esc(m.explain) + "</div></div>";
+  }
+
+  /* Consistency lives here rather than on Home: it is a shape over time
+     like everything else on this page, not a current-state number. */
+  const g = gymStats();
+  const wb = weekBuckets(16);
+  out += '<div class="panel"><div class="panel-label">Sessions, last 16 weeks</div>' + weeksStrip(wb) +
+    '<div class="divider"><div class="kv">' +
+    '<div><div class="k">This week</div><div class="v">' + g.week + "</div></div>" +
+    '<div><div class="k">This month</div><div class="v">' + g.month + "</div></div>" +
+    '<div><div class="k">Week streak</div><div class="v">' + g.streak + "</div></div>" +
+    '<div><div class="k">Per week</div><div class="v">' + n1(g.perWeek) + "</div></div>" +
+    "</div></div></div>";
+
+  shell(out);
+}
+
 function renderDash() {
   const t = today();
   const gi = groupIndex(t), oi = overallIndex(gi);
@@ -2243,9 +2503,7 @@ function renderDash() {
     out += '<div class="panel"><div class="body-copy">Nothing logged yet, so there is nothing to measure. Save a few sets and this page fills itself in: strength against bodyweight standards, progress against your starting loads, weight, and days at the gym.</div></div>';
     out += bwCard();
     out += '<div class="stack" style="margin-top:14px">' +
-      '<button class="btn-secondary" onclick="go({page:\'body\'})">Bodyweight</button>' +
-      '<button class="btn-secondary" onclick="go({page:\'whoop\'})">Recovery</button>' +
-      '<button class="btn-secondary auto" onclick="go({page:\'settings\'})">Setup</button>' +
+      '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
       "</div>";
     shell(out);
     return;
@@ -2261,11 +2519,16 @@ function renderDash() {
   const soft = MG_ORDER.filter((mg) => ss[mg].confidence === "single" || ss[mg].confidence === "wide").length;
   const pct = oi.idx == null ? null : oi.idx - 100;
   const pctPrev = prev && prev.idx != null ? prev.idx - 100 : null;
-  const uncal = PROGRAMME.filter((e) => e.unit === "pin" && pinToKg(e, 1) == null).length;
 
   out += '<div class="tiles">';
 
-  out += '<div class="tile lead wide">' +
+  const sparkProgress = sparkline(hist.map((p) => ({ x: p.date, y: p.idx - 100 })), "var(--pb)");
+  const sparkRatio = sparkline(hist.filter((p) => p.ratio != null).map((p) => ({ x: p.date, y: p.ratio })), "var(--mg-shoulders)");
+  const sparkBw = sparkline(bwSorted().map((r) => ({ x: r.date, y: r.kg })), "var(--mg-legs)");
+  const sparkDays = sparkline(weekBuckets(12).map((b) => ({ x: b.week, y: b.days })), "var(--accent)");
+
+  out += '<div class="tile lead wide' + (sparkProgress ? " has-spark" : "") + '">' +
+    (sparkProgress ? '<div class="tile-spark">' + sparkProgress + "</div>" : "") +
     '<div class="tile-label">Progress since start</div>' +
     '<div class="tile-val" style="color:var(--accent)">' +
     (pct == null ? "--" : (pct > 0 ? "+" : pct < 0 ? "−" : "") + Math.abs(Math.round(pct)) + '<span class="unit">%</span>') +
@@ -2276,7 +2539,8 @@ function renderDash() {
         ". No standards tables or conversions in this one, so it is the number to trust.") +
     "</div></div>";
 
-  out += '<div class="tile">' +
+  out += '<div class="tile' + (sparkRatio ? " has-spark" : "") + '">' +
+    (sparkRatio ? '<div class="tile-spark">' + sparkRatio + "</div>" : "") +
     '<div class="tile-label">Strength to weight</div>' +
     '<div class="tile-val">' + (s2w.ratio == null ? "--" : esc(String(n1(s2w.ratio)))) + '<span class="unit">× BW</span></div>' +
     '<div class="tile-foot">' + (s2w.ratio == null ? "Needs bodyweight."
@@ -2284,7 +2548,8 @@ function renderDash() {
         (prev && prev.ratio ? ". " + deltaSpan(s2w.ratio, prev.ratio, { fmt: (v) => n1(v), eps: 0.02 }) + " in four weeks" : "")) +
     "</div></div>";
 
-  out += '<div class="tile">' +
+  out += '<div class="tile' + (sparkBw ? " has-spark" : "") + '">' +
+    (sparkBw ? '<div class="tile-spark">' + sparkBw + "</div>" : "") +
     '<div class="tile-label">Bodyweight</div>' +
     '<div class="tile-val">' + (bw ? esc(String(n1(bw.kg))) : "--") + '<span class="unit">kg</span></div>' +
     '<div class="tile-foot">' + (bw
@@ -2293,7 +2558,8 @@ function renderDash() {
           : "First weigh-in " + esc(fmtDay(bw.date)))
       : "Not logged") + "</div></div>";
 
-  out += '<div class="tile">' +
+  out += '<div class="tile' + (sparkDays ? " has-spark" : "") + '">' +
+    (sparkDays ? '<div class="tile-spark">' + sparkDays + "</div>" : "") +
     '<div class="tile-label">Days at the gym</div>' +
     '<div class="tile-val">' + g.last28 + '<span class="unit"> / 28 days</span></div>' +
     '<div class="tile-foot">' + n1(g.perWeek) + " a week · " + g.total + " all time" +
@@ -2338,57 +2604,6 @@ function renderDash() {
     "<p>Cable pins and bodyweight movements count here with no calibration at all, because a ratio between two pin positions carries no units. That is why this number survives objections the strength score cannot: there are no population tables in it and no conversions between exercises.</p>" +
     "<p>It says nothing about whether a group is strong, only whether it is moving.</p>") +
     "</div>";
-
-  /* ---- trends ---- */
-  const stdPts = hist.filter((p) => p.std != null).map((p) => ({ x: p.date, y: p.std }));
-  out += trendPanel("Strength over time", stdPts,
-    "Needs a bodyweight entry plus a barbell or dumbbell lift logged in two different weeks.",
-    () => lineChart([{ pts: stdPts, c: "var(--accent)", area: true }], { ref: 50, refLabel: "intermediate", h: 130, yMin: 0 }));
-
-  out += trendPanel("Progress over time", hist,
-    "Log a second week of sets and this fills in.",
-    () => lineChart([{ pts: hist.map((p) => ({ x: p.date, y: p.idx - 100 })), c: "var(--pb)", area: true }],
-      { ref: 0, refLabel: "start", h: 126, fmt: (v) => (v > 0 ? "+" : "") + Math.round(v) + "%" }),
-    "Each point uses the eight weeks up to that week, so a deload shows up honestly rather than being smoothed away.");
-
-  const bwPts = bwSorted().map((r) => ({ x: r.date, y: r.kg }));
-  out += trendPanel("Bodyweight over time", bwPts,
-    "Weigh in twice and the line appears.",
-    () => lineChart([{ pts: bwPts, c: "var(--mg-legs)", area: true }], { h: 118, fmt: (v) => n1(v) + "kg" }));
-
-  const ratioPts = hist.filter((p) => p.ratio != null).map((p) => ({ x: p.date, y: p.ratio }));
-  out += trendPanel("Strength to weight over time", ratioPts,
-    "Needs bodyweight plus scoreable lifts in two different weeks.",
-    () => lineChart([{ pts: ratioPts, c: "var(--mg-shoulders)" }], { h: 118, fmt: (v) => n1(v) + "\u00d7" }),
-    "The one number a bulk cannot flatter. It rises only if the lifts move faster than the scale.");
-
-  const gseries = MG_ORDER.map((mg) => ({
-    pts: hist.filter((p) => p.gi[mg].idx != null).map((p) => ({ x: p.date, y: p.gi[mg].idx - 100 })),
-    c: MG[mg].c, w: 1.6, dots: false,
-  })).filter((s) => s.pts.length >= 2);
-  if (gseries.length) {
-    out += '<div class="panel"><div class="panel-label">Progress by group over time</div>' +
-      lineChart(gseries, { ref: 0, refLabel: "start", h: 140, fmt: (v) => (v > 0 ? "+" : "") + Math.round(v) + "%" }) +
-      '<div class="legend">' + MG_ORDER.map((mg) => '<span><i style="background:' + MG[mg].c + '"></i>' + esc(MG[mg].label) + "</span>").join("") + "</div></div>";
-  }
-
-  /* ---- consistency ---- */
-  const wb = weekBuckets(16);
-  out += '<div class="panel"><div class="panel-label">Sessions, last 16 weeks</div>' + weeksStrip(wb) +
-    '<div class="divider"><div class="kv">' +
-    '<div><div class="k">This week</div><div class="v">' + g.week + "</div></div>" +
-    '<div><div class="k">This month</div><div class="v">' + g.month + "</div></div>" +
-    '<div><div class="k">Week streak</div><div class="v">' + g.streak + "</div></div>" +
-    '<div><div class="k">Per week</div><div class="v">' + n1(g.perWeek) + "</div></div>" +
-    "</div></div></div>";
-
-  const volPts = wb.filter((b) => b.vol > 0).map((b) => ({ x: b.week, y: b.vol / 1000 }));
-  out += trendPanel("Tonnage per week", volPts,
-    "Needs sets logged in two different weeks. Cable work counts only once its stack is measured under Setup.",
-    () => lineChart([{ pts: volPts, c: "var(--mg-chest)", area: true }], { h: 118, fmt: (v) => n1(v) + "t" }),
-    "Load \u00d7 reps. Kilo lifts always, plus any cable machine whose stack you have measured" +
-    (uncal > 0 ? ", and " + uncal + " machine(s) are still unmeasured so their work is missing from this total" : "") +
-    ". Volume answers how much work, not how heavy.");
 
   /* ---- programme health ---- */
   const hc = healthCounts();
@@ -2436,9 +2651,7 @@ function renderDash() {
   out += bwCard();
 
   out += '<div class="stack" style="margin-top:14px">' +
-    '<button class="btn-secondary" onclick="go({page:\'body\'})">Bodyweight</button>' +
-    '<button class="btn-secondary" onclick="go({page:\'whoop\'})">Recovery</button>' +
-    '<button class="btn-secondary auto" onclick="go({page:\'settings\'})">Setup</button>' +
+    '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
     "</div>";
 
   shell(out);
@@ -2490,6 +2703,10 @@ function renderBody() {
         { h: 130, fmt: (v) => n1(v) + "kg" }));
   }
 
+  out += '<div class="stack" style="margin:4px 0 4px">' +
+    '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
+    "</div>";
+
   if (rows.length) {
     out += '<div class="panel"><div class="panel-label">' + rows.length + " entr" + (rows.length === 1 ? "y" : "ies") + "</div>";
     rows.slice(0, 40).forEach((r) => {
@@ -2526,7 +2743,7 @@ window.delBw = delBw;
 function renderWhoop() {
   const rows = whoopSorted().slice().reverse();
   const s7 = whoopStats(7), s28 = whoopStats(28);
-  let out = backBar("go({page:'home'})", "Recovery", "Whoop-shaped, hand-fed for now");
+  let out = backBar("go({page:'body'})", "Recovery", "Whoop-shaped, hand-fed for now");
 
   out += '<div class="placeholder" style="margin-bottom:14px">' +
     "<strong>Space held for Whoop.</strong> Whoop does publish a developer API, but it authenticates with an OAuth client " +
