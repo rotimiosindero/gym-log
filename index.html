@@ -352,11 +352,32 @@
   .sync {
     background: var(--accent-tint);
     border: 1px solid var(--accent-edge);
-    border-radius: 5px;
-    padding: 16px 18px;
+    border-radius: var(--r);
+    padding: 17px 18px 16px;
     margin-bottom: 14px;
+    text-align: center;
   }
-  .sync h3 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+  .sync .body-copy { max-width: 34em; margin-left: auto; margin-right: auto; }
+  .sync .stack { justify-content: center; }
+
+  /* A prompt, not a command. Pill rather than slab, outline rather than
+     fill, so shape and weight both place it below the primary button it
+     usually sits above. */
+  .btn-quiet {
+    display: inline-block;
+    margin: 0 auto;
+    padding: 9px 20px;
+    background: transparent;
+    border: 1px solid var(--accent-edge);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+  }
+  .btn-quiet:active { background: var(--accent-tint); }
+  .sync h3 { margin: 0 0 5px; font-size: 15px; font-weight: 600; letter-spacing: 0.1px; }
 
   .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
   .body-copy { font-size: 13px; color: var(--muted); line-height: 1.5; }
@@ -1077,7 +1098,7 @@ function syncBanner() {
   return '<div class="sync">' +
     "<h3>" + p.length + " entr" + (p.length === 1 ? "y" : "ies") + " not in Obsidian yet</h3>" +
     '<div class="body-copy" style="margin-bottom:14px">Logged ' + esc(when) + ". Append them to " + esc(state.settings.filepath || "Gym.md") + " to make the note the durable record.</div>" +
-    '<div class="stack"><button class="btn-primary auto" onclick="go({page:\'sync\'})">Append to Obsidian</button></div>' +
+    '<button class="btn-quiet" onclick="go({page:\'sync\'})">Append to Obsidian</button>' +
     "</div>";
 }
 
@@ -1184,7 +1205,7 @@ function renderSession() {
     h += '<div class="sync" style="margin-top:18px">' +
       "<h3>Done for today?</h3>" +
       '<div class="body-copy" style="margin-bottom:14px">' + p.length + " entr" + (p.length === 1 ? "y" : "ies") + " from this session are waiting to go into " + esc(state.settings.filepath || "Gym.md") + ".</div>" +
-      '<button class="btn-primary auto" onclick="go({page:\'sync\'})">Finish and append</button>' +
+      '<button class="btn-quiet" onclick="go({page:\'sync\'})">Finish and append</button>' +
       "</div>";
   }
 
