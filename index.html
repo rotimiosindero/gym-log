@@ -76,7 +76,16 @@
     --bad-edge: rgba(217,124,108,0.40);
   }
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* `manipulation` drops the double-tap-to-zoom gesture, which fires by
+     accident when you tap a stepper twice in quick succession while
+     logging. It deliberately does NOT disable pinch-to-zoom: that is the
+     one people rely on to enlarge text, and the viewport meta above stays
+     free of user-scalable=no for the same reason. */
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
 
   html, body {
     margin: 0;
