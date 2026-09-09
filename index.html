@@ -2378,6 +2378,14 @@ function trendMetrics() {
         ". Answers how much work, not how heavy.",
       waiting: "Needs sets logged in two different weeks.",
     },
+    sleep: {
+      label: "Sleep", c: "var(--mg-shoulders)", area: true, yMax: 12,
+      pts: whoopSorted().filter((r) => r.sleep != null).map((r) => ({ x: r.date, y: r.sleep })),
+      fmt: (v) => n1(v) + "h",
+      ref: 8, refLabel: "8h",
+      explain: "Hand-entered on the Recovery page for now. The moment a Whoop feed or an Apple Health Shortcut lands, it fills this same field, so the chart needs no change, only a source that stops requiring you to type it.",
+      waiting: "Log a second night on the Recovery page and this fills in.",
+    },
   };
 }
 
