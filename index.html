@@ -1529,6 +1529,18 @@ function renderSync() {
   }
   h += "</div>";
 
+  /* An escape hatch for entries that are already in the note. Without it the
+     only way to stop the app offering something was to send it again, which
+     writes it into Gym.md twice. Needed by anything logged before the sync
+     confirmation was made to survive a reload, and by any append made some
+     other way. */
+  h += '<div class="panel">' +
+    '<div style="font-size:15px;font-weight:600;margin-bottom:6px">Already in ' + esc(filepath) + "?</div>" +
+    '<div class="body-copy" style="margin-bottom:14px">If these lines are in the note already, mark them off rather than sending them again. ' +
+    "Nothing goes to Obsidian and nothing is written; they simply stop being offered. Worth checking the note first, because appending twice duplicates them.</div>" +
+    '<button class="btn-secondary auto" onclick="markAlreadyAppended()">Mark ' + entries.length +
+    " entr" + (entries.length === 1 ? "y" : "ies") + " as already there</button></div>";
+
   h += syncAskBanner();
 
   h += '<div class="panel">' +
@@ -1696,6 +1708,24 @@ function markSent() {
   setTimeout(render, 600);
 }
 window.markSent = markSent;
+
+/** Mark entries off without sending them. Asks first, because it changes
+ *  what the app believes about a file it cannot see. */
+function markAlreadyAppended() {
+  const entries = view.all ? state.log : pending();
+  if (!entries.length) { flash("Nothing waiting"); return; }
+  const where = state.settings.filepath || "Gym.md";
+  if (!confirm("Mark " + entries.length + " entr" + (entries.length === 1 ? "y" : "ies") +
+      " as already in " + where + "?\n\nNothing will be sent to Obsidian. Only do this if the lines are genuinely in the note, otherwise they are lost from the queue.")) return;
+  const ids = new Set(entries.map((l) => l.ts));
+  persist({
+    log: state.log.map((l) => (ids.has(l.ts) ? Object.assign({}, l, { synced: true }) : l)),
+    pendingSync: null,
+  });
+  flash("Marked as already appended");
+  go({ page: "home" });
+}
+window.markAlreadyAppended = markAlreadyAppended;
 
 function confirmSynced() {
   const p = state.pendingSync;
