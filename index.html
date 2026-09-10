@@ -140,6 +140,30 @@
   .tabbar svg { width: 22px; height: 22px; }
 
   /* ---------------- chips (metric / range pickers) ---------------- */
+  /* A panel on the recessed tone means the app received this straight from
+     an instrument rather than someone typing it. Paired with the date it was
+     taken, it reads as a reading rather than a record you keep. The rule is
+     literal: the moment Whoop feeds Recovery instead of Rotimi typing it,
+     that panel earns this too. No new colour, because colour is spoken for
+     by muscle group. */
+  .panel.measured { background: var(--panel2); }
+  .reading-when {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+  }
+  .reading-when::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); flex: 0 0 auto; opacity: 0.75;
+  }
+  /* The same dot on a tile, for the one number on Home that leans on a
+     reading rather than on today. */
+  .tile-measured { color: var(--muted); }
+  .tile-measured::before {
+    content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); opacity: 0.75; margin-right: 6px; vertical-align: 1px;
+  }
+
   .chiprow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .chip {
     padding: 7px 13px; border-radius: 20px;
@@ -963,7 +987,7 @@ async function copyText(text) {
 /* ----------------------------------------------------------------
    State
 ------------------------------------------------------------------*/
-let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [],
+let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [], inbody: [],
   settings: { vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 } };
 let view = { page: "home" };
 let err = null;
@@ -971,6 +995,7 @@ let draft = null;      // in-progress exercise entry
 let exportOpen = false;
 let awaitingConfirm = false;
 let infoOpen = null;      // which panel has its explanation open, if any
+let bodySeg = "weight";   // Body tab segment: weight | composition | recovery
 
 function load() {
   let saved = null;
@@ -991,6 +1016,7 @@ function load() {
     loads, peaks, log,
     bw: ((saved && saved.bw) || []).filter((r) => r && r.date && r.kg > 0),
     whoop: ((saved && saved.whoop) || []).filter((r) => r && r.date),
+    inbody: ((saved && saved.inbody) || []).filter((r) => r && r.date && r.at),
     settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 }, (saved && saved.settings) || {}),
   };
 }
@@ -1039,6 +1065,25 @@ function panelHead(label, key) {
 
 function infoBody(key, html) {
   return infoOpen === key ? '<div class="info-body body-copy">' + html + "</div>" : "";
+}
+
+/** Jump to the Body tab with a particular segment showing. */
+function goBody(seg) { bodySeg = seg; go({ page: "body" }); }
+window.goBody = goBody;
+
+function setBodySeg(seg) { bodySeg = seg; infoOpen = null; render(); }
+window.setBodySeg = setBodySeg;
+
+function bodySegments() {
+  const segs = [
+    { k: "weight", label: "Weight" },
+    { k: "composition", label: "Composition" },
+    { k: "recovery", label: "Recovery" },
+  ];
+  return '<div class="chiprow">' + segs.map((s) =>
+    '<button class="chip' + (bodySeg === s.k ? " active" : "") + '" onclick="setBodySeg(\'' + s.k + '\')">' +
+    esc(s.label) + "</button>"
+  ).join("") + "</div>";
 }
 
 function toggleInfo(k) {
@@ -1141,7 +1186,7 @@ function render() {
   if (view.page === "sync") return renderSync();
   if (view.page === "trends") return renderTrends();
   if (view.page === "body") return renderBody();
-  if (view.page === "whoop") return renderWhoop();
+  if (view.page === "whoop") { bodySeg = "recovery"; return renderBody(); }
   if (view.page === "settings") return renderSettings();
   return renderDash();
 }
@@ -1687,6 +1732,7 @@ function restoreBackup(input) {
         log: d.log,
         bw: Array.isArray(d.bw) ? d.bw : state.bw,
         whoop: Array.isArray(d.whoop) ? d.whoop : state.whoop,
+        inbody: Array.isArray(d.inbody) ? d.inbody : state.inbody,
         settings: Object.assign({}, state.settings, d.settings || {}),
       });
       flash("Restored " + d.log.length + " entries");
@@ -2623,7 +2669,7 @@ function renderDash() {
     out += '<div class="panel"><div class="body-copy">Nothing logged yet, so there is nothing to measure. Save a few sets and this page fills itself in: strength against bodyweight standards, progress against your starting loads, weight, and days at the gym.</div></div>';
     out += bwCard();
     out += '<div class="stack" style="margin-top:14px">' +
-      '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
+      '<button class="btn-secondary auto" onclick="goBody(\'recovery\')">Recovery</button>' +
       "</div>";
     shell(out);
     return;
@@ -2667,6 +2713,27 @@ function renderDash() {
       : Math.round(s2w.total) + "kg across five lifts" + (s2w.complete ? "" : ", " + esc(s2w.missing.join(" and ")) + " missing") +
         (prev && prev.ratio ? ". " + deltaSpan(s2w.ratio, prev.ratio, { fmt: (v) => n1(v), eps: 0.02 }) + " in four weeks" : "")) +
     "</div></div>";
+
+  /* Sits BESIDE the bodyweight ratio rather than replacing it, which is the
+     whole point: that one moves when you bulk or cut, this one strips that
+     out, and the two diverging is the actual signal. */
+  const leanKg = leanMassKg();
+  const lastScan = inbodyLatest();
+  if (leanKg && s2w.total > 0) {
+    const allScans = inbodySorted();
+    const priorScan = allScans.length > 1 ? allScans[allScans.length - 2] : null;
+    const scanAge = daysBetween(lastScan.date, t);
+    out += '<div class="tile">' +
+      '<div class="tile-label">Str : lean</div>' +
+      '<div class="tile-val">' + esc(String(n1(s2w.total / leanKg))) + '<span class="unit">× lean</span></div>' +
+      '<div class="tile-foot"><span class="tile-measured">' +
+      (scanAge === 0 ? "Measured today" : scanAge === 1 ? "Measured yesterday" : "Measured " + scanAge + " days ago") +
+      "</span><br>Against " + n1(leanKg) + "kg fat-free mass. " +
+      (priorScan && priorScan.ffm > 0
+        ? "Lean mass " + deltaSpan(leanKg, priorScan.ffm, { fmt: (v) => n1(v), eps: 0.1 }) + "kg since the scan before."
+        : "Where this and the ratio above disagree, a weight change was fat rather than muscle.") +
+      "</div></div>";
+  }
 
   out += '<div class="tile' + (sparkBw ? " has-spark" : "") + '">' +
     (sparkBw ? '<div class="tile-spark">' + sparkBw + "</div>" : "") +
@@ -2771,7 +2838,7 @@ function renderDash() {
   out += bwCard();
 
   out += '<div class="stack" style="margin-top:14px">' +
-    '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
+    '<button class="btn-secondary auto" onclick="goBody(\'recovery\')">Recovery</button>' +
     "</div>";
 
   shell(out);
@@ -2781,61 +2848,75 @@ function renderDash() {
 function renderBody() {
   const rows = bwSorted().slice().reverse();
   const last = bwLatest();
-  let out = backBar("go({page:'home'})", "Bodyweight", "One entry a day, the latest wins");
 
-  out += '<div class="panel">' +
-    '<div class="panel-label">Weigh in for ' + esc(fmtDay(today())) + "</div>" +
-    '<div class="bw-quick">' +
-    '<input class="load-input" id="bwInput" type="number" step="0.1" inputmode="decimal" placeholder="' +
-    (last ? esc(String(n1(last.kg))) : "kg") + '" onkeydown="if(event.key===\'Enter\')saveBw()">' +
-    '<button class="btn-primary auto" onclick="saveBw()">Save</button>' +
-    "</div>" +
-    '<div class="hint">Kilos. First thing, after the loo, before food, is the comparison that holds. ' +
-    (last ? "Last entry " + esc(String(n1(last.kg))) + "kg on " + esc(fmtDay(last.date)) + "." : "No entries yet.") + "</div></div>";
+  let out = backBar("go({page:'home'})", "Body",
+    bodySeg === "weight" ? "What you weigh, recorded daily"
+      : bodySeg === "composition" ? "What you are made of, measured quarterly"
+      : "How recovered you are, day to day");
 
-  if (rows.length >= 2) {
-    const deltas = [{ n: 7, d: bwDelta(7) }, { n: 28, d: bwDelta(28) }, { n: 90, d: bwDelta(90) }];
-    out += '<div class="panel"><div class="panel-label">Change</div><div class="kv">';
-    deltas.forEach((row) => {
-      const d = row.d;
-      const colour = d == null ? "var(--muted)" : Math.abs(d) < 0.2 ? "var(--text)" : d > 0 ? "var(--warn)" : "var(--pb)";
-      const txt = d == null ? "--" : (d > 0 ? "+" : d < 0 ? "\u2212" : "") + n1(Math.abs(d));
-      out += '<div><div class="k">' + row.n + ' days</div>' +
-        '<div class="v" style="color:' + colour + '">' + esc(String(txt)) + "</div></div>";
-    });
-    out += "</div>" +
-      '<div class="hint">Amber for up, green for down, which assumes you would rather be lighter. ' +
-      "If you are deliberately gaining, read them the other way round. The strength-to-weight ratio on the Progress page is what settles whether a gain is paying for itself.</div></div>";
-  } else {
-    out += '<div class="panel"><div class="panel-label">Change and history</div>' +
-      '<div class="body-copy">' +
-      (rows.length === 1
-        ? "One weigh-in so far, on " + esc(fmtDay(rows[0].date)) + ". Two or more and the 7, 28 and 90 day changes appear here with a chart underneath."
-        : "Nothing weighed yet. Save one above, then another on a different day, and the changes and the chart appear here.") +
-      "</div></div>";
+  out += bodySegments();
+
+  /* ---------------- weight: typed, daily ---------------- */
+  if (bodySeg === "weight") {
+    out += '<div class="panel">' +
+      '<div class="panel-label">Weigh in for ' + esc(fmtDay(today())) + "</div>" +
+      '<div class="bw-quick">' +
+      '<input class="load-input" id="bwInput" type="number" step="0.1" inputmode="decimal" placeholder="' +
+      (last ? esc(String(n1(last.kg))) : "kg") + '" onkeydown="if(event.key===\'Enter\')saveBw()">' +
+      '<button class="btn-primary auto" onclick="saveBw()">Save</button>' +
+      "</div>" +
+      '<div class="hint">Kilos. First thing, after the loo, before food, is the comparison that holds. ' +
+      (last ? "Last entry " + esc(String(n1(last.kg))) + "kg on " + esc(fmtDay(last.date)) + "." : "No entries yet.") + "</div></div>";
+
+    if (rows.length >= 2) {
+      const deltas = [{ n: 7, d: bwDelta(7) }, { n: 28, d: bwDelta(28) }, { n: 90, d: bwDelta(90) }];
+      out += '<div class="panel"><div class="panel-label">Change</div><div class="kv">';
+      deltas.forEach((row) => {
+        const d = row.d;
+        const colour = d == null ? "var(--muted)" : Math.abs(d) < 0.2 ? "var(--text)" : d > 0 ? "var(--warn)" : "var(--pb)";
+        const txt = d == null ? "--" : (d > 0 ? "+" : d < 0 ? "\u2212" : "") + n1(Math.abs(d));
+        out += '<div><div class="k">' + row.n + ' days</div>' +
+          '<div class="v" style="color:' + colour + '">' + esc(String(txt)) + "</div></div>";
+      });
+      out += "</div>" +
+        '<div class="hint">Amber for up, green for down, which assumes you would rather be lighter. ' +
+        "If you are deliberately gaining, read them the other way round. The strength-to-weight ratio on Home is what settles whether a gain is paying for itself.</div></div>";
+    } else {
+      out += '<div class="panel"><div class="panel-label">Change and history</div>' +
+        '<div class="body-copy">' +
+        (rows.length === 1
+          ? "One weigh-in so far, on " + esc(fmtDay(rows[0].date)) + ". Two or more and the 7, 28 and 90 day changes appear here with a chart underneath."
+          : "Nothing weighed yet. Save one above, then another on a different day, and the changes and the chart appear here.") +
+        "</div></div>";
+    }
+
+    if (rows.length >= 2) {
+      out += trendPanel("History", bwSorted().map((r) => ({ x: r.date, y: r.kg })), "",
+        () => lineChart([{ pts: bwSorted().map((r) => ({ x: r.date, y: r.kg })), c: "var(--mg-legs)", area: true }],
+          { h: 130, fmt: (v) => n1(v) + "kg" }));
+    }
+
+    if (rows.length) {
+      out += '<div class="panel"><div class="panel-label">' + rows.length + " entr" + (rows.length === 1 ? "y" : "ies") + "</div>";
+      rows.slice(0, 40).forEach((r) => {
+        out += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + '<span style="color:var(--muted)"> \u00b7 ' + esc(r.date.slice(0, 4)) + "</span></span>" +
+          '<span>' + esc(String(n1(r.kg))) + "kg" +
+          '<button class="btn-back" style="margin:0 0 0 10px;font-size:13px" onclick="delBw(\'' + esc(r.date) + '\')">Remove</button></span></div>';
+      });
+      if (rows.length > 40) out += '<div class="hint">Showing the most recent 40.</div>';
+      out += "</div>";
+    }
   }
 
-  /* The sparse case is already covered by the panel above, which mentions the
-     chart, so this one only appears once there is a line worth drawing. */
-  if (rows.length >= 2) {
-    out += trendPanel("History", bwSorted().map((r) => ({ x: r.date, y: r.kg })), "",
-      () => lineChart([{ pts: bwSorted().map((r) => ({ x: r.date, y: r.kg })), c: "var(--mg-legs)", area: true }],
-        { h: 130, fmt: (v) => n1(v) + "kg" }));
+  /* ---------------- composition: measured, quarterly ---------------- */
+  if (bodySeg === "composition") {
+    out += inbodyPrompt();
+    out += inbodyPanel();
   }
 
-  out += '<div class="stack" style="margin:4px 0 4px">' +
-    '<button class="btn-secondary auto" onclick="go({page:\'whoop\'})">Recovery</button>' +
-    "</div>";
-
-  if (rows.length) {
-    out += '<div class="panel"><div class="panel-label">' + rows.length + " entr" + (rows.length === 1 ? "y" : "ies") + "</div>";
-    rows.slice(0, 40).forEach((r) => {
-      out += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + '<span style="color:var(--muted)"> · ' + esc(r.date.slice(0, 4)) + "</span></span>" +
-        '<span>' + esc(String(n1(r.kg))) + "kg" +
-        '<button class="btn-back" style="margin:0 0 0 10px;font-size:13px" onclick="delBw(\'' + esc(r.date) + '\')">Remove</button></span></div>';
-    });
-    if (rows.length > 40) out += '<div class="hint">Showing the most recent 40.</div>';
-    out += "</div>";
+  /* ---------------- recovery: typed for now ---------------- */
+  if (bodySeg === "recovery") {
+    out += whoopContent();
   }
 
   shell(out);
@@ -2860,10 +2941,12 @@ function delBw(date) {
 window.delBw = delBw;
 
 /* ---------------- recovery / whoop ---------------- */
-function renderWhoop() {
+/** The Recovery segment. Still typed by hand, so it does NOT get the
+ *  measured surface; it earns that the day a Whoop feed fills it. */
+function whoopContent() {
   const rows = whoopSorted().slice().reverse();
   const s7 = whoopStats(7), s28 = whoopStats(28);
-  let out = backBar("go({page:'body'})", "Recovery", "Whoop-shaped, hand-fed for now");
+  let out = "";
 
   out += '<div class="placeholder" style="margin-bottom:14px">' +
     "<strong>Space held for Whoop.</strong> Whoop does publish a developer API, but it authenticates with an OAuth client " +
@@ -2929,7 +3012,7 @@ function renderWhoop() {
     out += "</div>";
   }
 
-  shell(out);
+  return out;
 }
 
 function saveWhoop() {
@@ -3128,6 +3211,355 @@ function fillPins(overwrite) {
 }
 window.fillPins = fillPins;
 
+
+
+/* ================================================================
+   INBODY IMPORT
+
+   A body composition scan roughly every three months, exported as CSV
+   from the InBody app. Parsed at run time and kept in this browser
+   only, like everything else logged here.
+
+   Three things about the real file that a guessed parser gets wrong:
+
+     Units vary with the app's own setting. An imperial export gives mass
+     in pounds and energy in kJ; a metric one gives kilos and kcal. Both
+     have been seen from the same scan, so nothing is assumed: the unit is
+     read out of each header and only converted when it needs to be.
+     Reading a pound figure as kilos is wrong by a factor of 2.2, and
+     converting a kcal figure as though it were kJ divides it by 4.184,
+     so both are checked against the header rather than trusted.
+
+     One header is misspelled: "Left leg Lean Mass(lb)" where the other
+     four segmental columns say "Leg". Headers are therefore matched on a
+     normalised form (lowercased, unit and punctuation stripped), which
+     also absorbs the trailing full stop in "Measurement device.".
+
+     Absent values are "-", not empty. Four arrived that way, including
+     Soft Lean Mass, so lean mass is derived as weight minus fat rather
+     than read from that column.
+
+   Deliberately NOT merged into the bodyweight series: a gym InBody and a
+   home scale are different instruments and mixing them puts step changes
+   into the trend that look like weight change but are not. The scan
+   weight lives on the scan record instead.
+================================================================= */
+
+const LB_TO_KG = 0.45359237;
+const KJ_PER_KCAL = 4.184;
+
+/** Lowercase, drop the parenthetical unit, drop everything that is not
+ *  alphanumeric. Makes header matching immune to case, spacing,
+ *  punctuation and the misspelling above. */
+const normHdr = (h) => String(h).toLowerCase().replace(/\([^)]*\)/g, "").replace(/[^a-z0-9]/g, "");
+
+/** The unit InBody declared inside the header, e.g. "lb" from "Weight(lb)". */
+const hdrUnit = (h) => { const m = String(h).match(/\(([^)]*)\)/); return m ? m[1].trim().toLowerCase() : ""; };
+
+/**
+ * The columns worth keeping, keyed by normalised header.
+ *   mass  true when the value is a weight and may need converting
+ *   good  which direction is an improvement, for colouring deltas
+ */
+const INBODY_MAP = {
+  weight:              { k: "weight",   label: "Weight",          unit: "kg", mass: true,  good: null },
+  skeletalmusclemass:  { k: "smm",      label: "Skeletal muscle", unit: "kg", mass: true,  good: "up" },
+  bodyfatmass:         { k: "fat",      label: "Body fat",        unit: "kg", mass: true,  good: "down" },
+  percentbodyfat:      { k: "pbf",      label: "Body fat",        unit: "%",  mass: false, good: "down" },
+  bmi:                 { k: "bmi",      label: "BMI",             unit: "",   mass: false, good: null },
+  basalmetabolicrate:  { k: "bmr",      label: "BMR",             unit: "",   mass: false, good: null, energy: true },
+  inbodyscore:         { k: "score",    label: "InBody score",    unit: "",   mass: false, good: "up" },
+  inbodyage:           { k: "age",      label: "InBody age",      unit: "",   mass: false, good: "down" },
+  visceralfatlevel:    { k: "visceral", label: "Visceral fat",    unit: "",   mass: false, good: "down" },
+  visceralfatarea:     { k: "vfArea",   label: "Visceral area",   unit: "cm²", mass: false, good: "down" },
+  totalbodywater:      { k: "tbw",      label: "Body water",      unit: "L",  mass: false, good: null },
+  smi:                 { k: "smi",      label: "Muscle index",    unit: "",   mass: false, good: "up" },
+  wholebodyphaseangle: { k: "phase",    label: "Phase angle",     unit: "°",  mass: false, good: "up" },
+  waisthipratio:       { k: "whr",      label: "Waist to hip",    unit: "",   mass: false, good: "down" },
+  protein:             { k: "protein",  label: "Protein",         unit: "kg", mass: true,  good: "up" },
+  /* segmental lean, the independent read on left/right balance */
+  rightarmleanmass:    { k: "leanArmR", label: "Right arm",  unit: "kg", mass: true, good: "up", seg: "lean" },
+  leftarmleanmass:     { k: "leanArmL", label: "Left arm",   unit: "kg", mass: true, good: "up", seg: "lean" },
+  trunkleanmass:       { k: "leanTrunk",label: "Trunk",      unit: "kg", mass: true, good: "up", seg: "lean" },
+  rightlegleanmass:    { k: "leanLegR", label: "Right leg",  unit: "kg", mass: true, good: "up", seg: "lean" },
+  leftlegleanmass:     { k: "leanLegL", label: "Left leg",   unit: "kg", mass: true, good: "up", seg: "lean" },
+};
+
+/** InBody stamps the scan as YYYYMMDDHHMMSS. */
+function parseInBodyDate(raw) {
+  const s = String(raw).replace(/\D/g, "");
+  if (s.length < 8) return null;
+  const d = s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8);
+  return isDateStr(d) ? { date: d, at: s } : null;
+}
+
+const isDateStr = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(parseD(s).getTime());
+
+/** Splits a CSV line, honouring quoted fields. */
+function splitCsvLine(line) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+/**
+ * Returns { scans, skipped, unknown }, never throwing on a bad file, so a
+ * paste of the wrong thing reports rather than breaks the page.
+ */
+function parseInBody(text) {
+  const lines = String(text).replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim().length);
+  if (lines.length < 2) return { scans: [], skipped: 0, unknown: [], error: "Needs a header row and at least one scan." };
+
+  const hdr = splitCsvLine(lines[0]);
+  const cols = hdr.map((h) => ({ norm: normHdr(h), unit: hdrUnit(h), raw: h }));
+  const dateCol = cols.findIndex((c) => c.norm === "date");
+  if (dateCol < 0) return { scans: [], skipped: 0, unknown: [], error: "No Date column found. Is this an InBody export?" };
+
+  const known = Object.keys(INBODY_MAP);
+  const unknown = cols.filter((c) => c.norm && c.norm !== "date" && known.indexOf(c.norm) < 0).map((c) => c.raw);
+
+  const scans = [];
+  let skipped = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const vals = splitCsvLine(lines[i]);
+    if (vals.length !== hdr.length) { skipped++; continue; }
+    const when = parseInBodyDate(vals[dateCol]);
+    if (!when) { skipped++; continue; }
+
+    const rec = { date: when.date, at: when.at, ts: Date.now() };
+    cols.forEach((c, idx) => {
+      const spec = INBODY_MAP[c.norm];
+      if (!spec) return;
+      const raw = String(vals[idx]).trim();
+      if (!raw || raw === "-") return;              // InBody's own "not measured"
+      let n = parseFloat(raw);
+      if (!isFinite(n)) return;
+      if (spec.mass && (c.unit === "lb" || c.unit === "lbs")) n = n * LB_TO_KG;
+      /* Energy comes as kJ from an imperial export and kcal from a metric
+         one, so converting unconditionally understates a kcal figure by
+         4.184x. The header decides, as it does for mass. */
+      if (spec.energy) rec.bmrKcal = Math.round(c.unit === "kj" ? n / KJ_PER_KCAL : n);
+      rec[spec.k] = Number(n.toFixed(3));
+    });
+
+    /* Soft Lean Mass came through as "-", so lean mass is derived. Weight
+       minus fat is the conventional denominator anyway and needs only the
+       two best-populated columns. */
+    if (rec.weight != null && rec.fat != null) rec.ffm = Number((rec.weight - rec.fat).toFixed(3));
+    /* BMI and weight pin down height, which nothing else here knows. */
+    if (rec.bmi > 0 && rec.weight != null) rec.heightM = Number(Math.sqrt(rec.weight / rec.bmi).toFixed(4));
+
+    if (rec.weight != null || rec.smm != null) scans.push(rec);
+    else skipped++;
+  }
+  return { scans: scans, skipped: skipped, unknown: unknown };
+}
+
+const inbodySorted = () => state.inbody.slice().sort((a, b) => String(a.at).localeCompare(String(b.at)));
+const inbodyLatest = () => { const s = inbodySorted(); return s.length ? s[s.length - 1] : null; };
+
+/** Lean mass as at the latest scan, for the strength-to-lean ratio. It is
+ *  up to three months stale by design, so callers name the scan date. */
+function leanMassKg() {
+  const s = inbodyLatest();
+  return s && s.ffm > 0 ? s.ffm : null;
+}
+
+/* ---- import, review before writing anything ---- */
+let inbodyPending = null;
+
+function reviewInBody() {
+  const el = document.getElementById("inbodyPaste");
+  const res = parseInBody(el ? el.value : "");
+  if (res.error) { flash(res.error); return; }
+  if (!res.scans.length) { flash("No readable scans in that. " + res.skipped + " row(s) skipped"); return; }
+  const known = new Set(state.inbody.map((r) => r.at));
+  inbodyPending = {
+    scans: res.scans,
+    fresh: res.scans.filter((s) => !known.has(s.at)).length,
+    skipped: res.skipped,
+    unknown: res.unknown,
+  };
+  render();
+}
+window.reviewInBody = reviewInBody;
+
+function confirmInBody() {
+  if (!inbodyPending) return;
+  const incoming = inbodyPending.scans;
+  const byAt = {};
+  /* Re-importing the same export must not double up, so a scan is keyed on
+     its own timestamp and the newer parse wins. */
+  state.inbody.concat(incoming).forEach((r) => { byAt[r.at] = r; });
+  const merged = Object.keys(byAt).map((k) => byAt[k]).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const n = inbodyPending.fresh;
+  inbodyPending = null;
+  persist({ inbody: merged });
+  flash(n ? n + " scan(s) imported" : "Already had those scans, nothing new");
+  render();
+}
+window.confirmInBody = confirmInBody;
+
+function cancelInBody() { inbodyPending = null; render(); }
+window.cancelInBody = cancelInBody;
+
+function inbodyPrompt() {
+  const p = inbodyPending;
+  if (!p) return "";
+  const s = p.scans[p.scans.length - 1];
+  const bits = [p.scans.length + " scan(s) read", p.fresh + " new"];
+  if (p.skipped) bits.push(p.skipped + " row(s) unreadable");
+  return '<div class="sync">' +
+    "<h3>Import this?</h3>" +
+    '<div class="body-copy" style="margin-bottom:6px">' + esc(bits.join(", ")) + ". Latest is " + esc(fmtDay(s.date)) +
+    (s.weight != null ? ", " + n1(s.weight) + "kg" : "") +
+    (s.pbf != null ? " at " + n1(s.pbf) + "% fat" : "") + ".</div>" +
+    (p.unknown.length
+      ? '<div class="hint" style="margin-bottom:12px">' + p.unknown.length + " column(s) in the file are not used here and will be ignored.</div>"
+      : '<div style="height:8px"></div>') +
+    '<div class="stack">' +
+    '<button class="btn-primary auto" onclick="confirmInBody()">Import</button>' +
+    '<button class="btn-secondary auto" onclick="cancelInBody()">Discard</button>' +
+    "</div></div>";
+}
+
+/* ---- the scan panel ---- */
+
+/** Left against right, as a percentage of the pair. InBody's own reading on
+ *  balance, arrived at without any reference to what has been logged. */
+function segBalance(s, rKey, lKey) {
+  const r = s[rKey], l = s[lKey];
+  if (r == null || l == null || r + l === 0) return null;
+  const mean = (r + l) / 2;
+  return { r: r, l: l, diff: ((r - l) / mean) * 100, strongerSide: r > l ? "right" : "left" };
+}
+
+function inbodyPanel() {
+  const scans = inbodySorted();
+  if (!scans.length) {
+    return '<div class="panel">' + panelHead("Body composition", "inbody") +
+      '<div class="body-copy">Nothing imported yet. Export the CSV from the InBody app and paste it below. ' +
+      "Weight, muscle and fat all land here, and the scan weight is kept separate from your daily weigh-ins on purpose.</div>" +
+      inbodyImportBox() +
+      infoBody("inbody", INBODY_INFO) + "</div>";
+  }
+
+  const s = scans[scans.length - 1];
+  const prev = scans.length > 1 ? scans[scans.length - 2] : null;
+  const gap = prev ? daysBetween(prev.date, s.date) : null;
+
+  let out = '<div class="panel measured">' + panelHead("Body composition", "inbody");
+  /* Leads with the moment it was taken, because that is what separates a
+     reading from a record: this is one instant, not an ongoing series. */
+  out += '<div class="reading-when">Measured ' + esc(fmtDay(s.date)) + " " + esc(s.date.slice(0, 4)) + "</div>";
+  out += '<div class="body-copy" style="margin-bottom:14px">' +
+    (prev ? gap + " days after the scan before." : "First scan, so there is nothing to compare against yet; the next one will show what moved.") +
+    "</div>";
+
+  /* The three that matter, with their movement since the last scan. */
+  const headline = [
+    { k: "smm", label: "Skeletal muscle", unit: "kg", good: "up" },
+    { k: "fat", label: "Body fat", unit: "kg", good: "down" },
+    { k: "pbf", label: "Body fat", unit: "%", good: "down" },
+    { k: "ffm", label: "Fat-free mass", unit: "kg", good: "up" },
+  ].filter((f) => s[f.k] != null);
+
+  out += '<div class="kv" style="margin-bottom:4px">' + headline.map((f) =>
+    '<div><div class="k">' + esc(f.label) + (f.unit === "%" ? " %" : "") + "</div>" +
+    '<div class="v">' + esc(String(n1(s[f.k]))) + '<span style="font-size:12px;color:var(--muted)">' +
+    (f.unit === "%" ? "%" : f.unit) + "</span></div>" +
+    (prev && prev[f.k] != null
+      ? '<div style="font-size:12px;margin-top:3px">' +
+        deltaSpan(s[f.k], prev[f.k], { fmt: (v) => n1(v), eps: 0.05, invert: f.good === "down" }) + "</div>"
+      : "") +
+    "</div>"
+  ).join("") + "</div>";
+
+  /* Weight, said plainly to be a different instrument from the daily scale. */
+  if (s.weight != null) {
+    const home = bwLatest();
+    out += '<div class="divider body-copy">Scan weight ' + n1(s.weight) + "kg" +
+      (home ? ", against " + n1(home.kg) + "kg on your own scale " + esc(fmtDay(home.date)) +
+        (Math.abs(home.kg - s.weight) >= 0.8
+          ? ". A gap that size is usually the two instruments disagreeing rather than real change, which is why this one stays out of the bodyweight chart."
+          : ". Close enough that the two instruments agree.")
+        : ". Kept out of the bodyweight chart because it is a different instrument from your own scale.") +
+      "</div>";
+  }
+
+  /* BMI on its own is misleading for anyone carrying muscle, so it never
+     appears without the body fat figure next to it. */
+  if (s.bmi != null && s.pbf != null) {
+    const label = s.bmi >= 25 ? (s.pbf < 20 ? "which would read as overweight on BMI alone, while the fat figure says otherwise" : "in the overweight band") : "in the healthy band";
+    out += '<div class="divider body-copy">BMI ' + n1(s.bmi) + ", " + esc(label) +
+      ". BMI cannot tell muscle from fat, so it is only shown here alongside the measurement that can." + "</div>";
+  }
+
+  /* Segmental symmetry: an independent check on the balance radar. */
+  const arms = segBalance(s, "leanArmR", "leanArmL");
+  const legs = segBalance(s, "leanLegR", "leanLegL");
+  if (arms || legs) {
+    out += '<div class="divider"><div class="lbl" style="margin-bottom:8px">Left against right</div>';
+    [{ n: "Arms", b: arms }, { n: "Legs", b: legs }].forEach((row) => {
+      if (!row.b) return;
+      const d = Math.abs(row.b.diff);
+      const tone = d < 3 ? C.pb : d < 6 ? C.warn : C.bad;
+      out += '<div class="list-row"><span>' + row.n + "</span>" +
+        '<span style="color:' + tone + '">' + n1(d) + "% apart" +
+        '<span style="color:var(--muted)"> · ' + n1(row.b.l) + "kg left, " + n1(row.b.r) + "kg right</span></span></div>";
+    });
+    out += '<div class="hint">Under about 3% is normal variation. This is measured, not inferred from what you have logged, so it is the one genuinely independent check on whether your training is balanced.</div></div>';
+  }
+
+  /* Everything else worth a glance, one line, no ceremony. */
+  const extras = [
+    { k: "score", label: "InBody score" }, { k: "visceral", label: "Visceral fat level" },
+    { k: "bmrKcal", label: "BMR", suffix: " kcal" }, { k: "smi", label: "Muscle index" },
+    { k: "phase", label: "Phase angle", suffix: "°" }, { k: "tbw", label: "Body water", suffix: "L" },
+  ].filter((f) => s[f.k] != null);
+  if (extras.length) {
+    out += '<div class="divider body-copy">' + extras.map((f) =>
+      esc(f.label) + " " + n1(s[f.k]) + (f.suffix || "")
+    ).join(" · ") + "</div>";
+  }
+
+  if (scans.length > 1) {
+    out += '<div class="divider"><div class="lbl" style="margin-bottom:8px">' + scans.length + " scans</div>";
+    scans.slice().reverse().forEach((r) => {
+      out += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + '<span style="color:var(--muted)"> · ' + esc(r.date.slice(0, 4)) + "</span></span>" +
+        '<span style="color:var(--muted)">' + (r.smm != null ? n1(r.smm) + "kg muscle" : "") +
+        (r.pbf != null ? " · " + n1(r.pbf) + "% fat" : "") + "</span></div>";
+    });
+    out += "</div>";
+  }
+
+  out += inbodyImportBox();
+  out += infoBody("inbody", INBODY_INFO);
+  return out + "</div>";
+}
+
+function inbodyImportBox() {
+  return '<div class="divider">' +
+    '<div class="lbl" style="margin-bottom:6px">Import a scan</div>' +
+    '<textarea class="field" id="inbodyPaste" rows="3" placeholder="Paste the CSV from the InBody app, header row included"></textarea>' +
+    '<div class="stack" style="margin-top:10px"><button class="btn-secondary auto" onclick="reviewInBody()">Read it</button></div>' +
+    "</div>";
+}
+
+const INBODY_INFO =
+  "<p>Pasted straight from the InBody app's CSV export. It is read here and kept in this browser only, never sent anywhere and never written into the app's source.</p>" +
+  "<p>The export is in pounds; everything above has been converted to kilos. Values InBody did not measure arrive as a dash and are skipped rather than read as zero. Soft lean mass is one of those, so fat-free mass above is weight minus fat mass, which is the conventional denominator anyway.</p>" +
+  "<p>Scan weight is deliberately kept out of the bodyweight chart. A gym InBody and a home scale are calibrated differently and used at different times of day, so mixing them would put steps into the trend that look like weight change and are not.</p>";
 
 /* ---- boot ---- */
 load();
