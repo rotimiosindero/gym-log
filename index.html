@@ -552,6 +552,7 @@
   .weeks .wk { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
   .weeks .wk i { display: block; height: 9px; border-radius: 1px; background: var(--accent); }
   .weeks .wk i.empty { background: var(--panel2); }
+  .weeks .wk i.over { background: var(--pb); }
   .weeks .wk.now i.empty { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
   .weeks .wk.picked i.empty { background: var(--line); }
   .weeks .wk.picked i { background: var(--text); }
@@ -998,13 +999,17 @@ async function copyText(text) {
 /* ----------------------------------------------------------------
    State
 ------------------------------------------------------------------*/
-let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [], inbody: [],
+let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [], inbody: [], pendingSync: null,
   settings: { vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 } };
 let view = { page: "home" };
 let err = null;
 let draft = null;      // in-progress exercise entry
 let exportOpen = false;
-let awaitingConfirm = false;
+/* Whether we are waiting to hear if an append landed in Obsidian lives in
+   storage, not in a variable. Tapping the link hands off to another app and
+   iOS routinely kills a home-screen web app while it is backgrounded, so an
+   in-memory flag was gone by the time you came back: the question was never
+   asked, nothing was ever marked synced, and the banner nagged forever. */
 let infoOpen = null;      // which panel has its explanation open, if any
 let bodySeg = "weight";   // Body tab segment: weight | composition | recovery
 
@@ -1028,6 +1033,7 @@ function load() {
     bw: ((saved && saved.bw) || []).filter((r) => r && r.date && r.kg > 0),
     whoop: ((saved && saved.whoop) || []).filter((r) => r && r.date),
     inbody: ((saved && saved.inbody) || []).filter((r) => r && r.date && r.at),
+    pendingSync: (saved && saved.pendingSync) || null,
     settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 }, (saved && saved.settings) || {}),
   };
 }
@@ -1056,7 +1062,6 @@ function go(next) {
   view = next;
   draft = null;
   exportOpen = false;
-  awaitingConfirm = false;
   infoOpen = null;
   window.scrollTo(0, 0);
   render();
@@ -1524,15 +1529,7 @@ function renderSync() {
   }
   h += "</div>";
 
-  if (awaitingConfirm) {
-    h += '<div class="sync">' +
-      "<h3>Did it land in " + esc(filepath) + "?</h3>" +
-      '<div class="body-copy" style="margin-bottom:14px">This page cannot see inside Obsidian, so confirm and these entries stop being offered.</div>' +
-      '<div class="stack">' +
-      '<button class="btn-primary auto" onclick="confirmSynced(' + (all ? "true" : "false") + ')">Yes, mark as appended</button>' +
-      '<button class="btn-secondary auto" onclick="awaitingConfirm=false;render()">Not yet</button>' +
-      "</div></div>";
-  }
+  h += syncAskBanner();
 
   h += '<div class="panel">' +
     '<div class="panel-label">What gets written</div>' +
@@ -1691,17 +1688,54 @@ function setSetting(k, v) {
 window.setSetting = setSetting;
 
 function markSent() {
-  // The link hands off to Obsidian; we cannot observe the result, so ask.
-  awaitingConfirm = true;
+  /* The link hands off to Obsidian and this page cannot see inside it, so
+     note which entries went and ask when you return, however long that is
+     and whether or not the app was reloaded in between. */
+  const entries = view.all ? state.log : pending();
+  persist({ pendingSync: { at: Date.now(), ids: entries.map((l) => l.ts), all: !!view.all } });
   setTimeout(render, 600);
 }
 window.markSent = markSent;
 
-function confirmSynced(all) {
-  const ids = new Set((all ? state.log : pending()).map((l) => l.ts));
-  persist({ log: state.log.map((l) => (ids.has(l.ts) ? Object.assign({}, l, { synced: true }) : l)) });
+function confirmSynced() {
+  const p = state.pendingSync;
+  /* Mark exactly the entries that were sent, not whatever is pending now:
+     anything logged while you were in Obsidian has not been appended. */
+  const ids = new Set(p && p.ids ? p.ids : pending().map((l) => l.ts));
+  persist({
+    log: state.log.map((l) => (ids.has(l.ts) ? Object.assign({}, l, { synced: true }) : l)),
+    pendingSync: null,
+  });
   flash("Marked as appended");
   go({ page: "home" });
+}
+
+/** Said no, or not yet. Stop asking, but leave the entries unappended so the
+ *  ordinary banner still offers them. */
+function dismissSyncAsk() {
+  persist({ pendingSync: null });
+  render();
+}
+window.dismissSyncAsk = dismissSyncAsk;
+
+/** The question itself, shown wherever you land after coming back. */
+function syncAskBanner() {
+  const p = state.pendingSync;
+  if (!p) return "";
+  const stillPending = p.ids.filter((id) => state.log.some((l) => l.ts === id && !l.synced));
+  if (!stillPending.length) { return ""; }
+  const mins = Math.round((Date.now() - p.at) / 60000);
+  const when = mins < 2 ? "a moment ago" : mins < 60 ? mins + " minutes ago"
+    : mins < 1440 ? Math.round(mins / 60) + " hours ago" : Math.round(mins / 1440) + " days ago";
+  return '<div class="sync">' +
+    "<h3>Did those " + stillPending.length + " entr" + (stillPending.length === 1 ? "y" : "ies") + " land in " +
+    esc(state.settings.filepath || "Gym.md") + "?</h3>" +
+    '<div class="body-copy" style="margin-bottom:14px">You sent them ' + esc(when) +
+    ". This page cannot see inside Obsidian, so it has to ask before it stops offering them.</div>" +
+    '<div class="stack">' +
+    '<button class="btn-primary auto" onclick="confirmSynced()">Yes, they landed</button>' +
+    '<button class="btn-secondary auto" onclick="dismissSyncAsk()">No, not yet</button>' +
+    "</div></div>";
 }
 window.confirmSynced = confirmSynced;
 
@@ -2319,7 +2353,15 @@ window.pickWeek = pickWeek;
  */
 function weeksStrip(buckets) {
   const counts = buckets.map((b) => b.days);
-  const maxRows = Math.max(3, Math.max.apply(null, counts));
+  /* The column is scaled to the programme's own week, so a full column is a
+     complete week and a short one is what you missed. It used to be
+     max(3, busiest week), which meant the scale silently changed with the
+     data: three rows on a quiet month, five on a busy one, with the same
+     height meaning different things. Only a week that beats the programme
+     grows it now, and those blocks are marked as over. */
+  const target = SESSIONS.length;
+  const busiest = Math.max.apply(null, counts);
+  const maxRows = Math.max(target, busiest);
   const last = buckets[buckets.length - 1];
 
   let h = '<div class="weeks">';
@@ -2328,7 +2370,17 @@ function weeksStrip(buckets) {
     const picked = weekPick && weekPick.week === b.week;
     h += '<div class="wk' + (isNow ? " now" : "") + (picked ? " picked" : "") +
       '" data-week="' + esc(b.week) + '" data-days="' + b.days + '" onclick="pickWeek(this)">';
-    for (let r = 0; r < maxRows; r++) h += "<i" + (r < b.days ? "" : ' class="empty"') + "></i>";
+    /* Rows are drawn top down, so the block at row r is session number
+       (maxRows - r). Counting that way makes the column fill from the
+       bottom like any other bar, instead of hanging from the top, and puts
+       a session beyond the programme's week at the top where it reads as
+       extra rather than as the foundation. */
+    for (let r = 0; r < maxRows; r++) {
+      const sessionNo = maxRows - r;
+      const filled = sessionNo <= b.days;
+      const beyond = sessionNo > target;
+      h += "<i" + (filled ? (beyond ? ' class="over"' : "") : ' class="empty"') + "></i>";
+    }
     h += "</div>";
   });
   h += "</div>";
@@ -2352,10 +2404,14 @@ function weeksStrip(buckets) {
   const pick = weekPick && buckets.some((b) => b.week === weekPick.week) ? weekPick : null;
   h += '<div class="wk-readout">' +
     (pick
-      ? "<b>" + pick.days + "</b> session" + (pick.days === 1 ? "" : "s") + " in the week of " + esc(fmtDay(pick.week))
-      : "Each block is one session. Tap a week to read it.") +
+      ? "<b>" + pick.days + " of " + target + "</b> session" + (pick.days === 1 ? "" : "s") +
+        " in the week of " + esc(fmtDay(pick.week))
+      : "Each block is one session, " + target + " to a full week. Tap a column to read it.") +
     "</div>";
-  h += '<div class="hint">Oldest week on the left. The last column is this week, ' +
+  h += '<div class="hint">One block per session, ' + target +
+    " to a full column because that is what your programme asks for a week, so a short column is what you missed" +
+    (busiest > target ? ", and a taller one is a week you went beyond it" : "") +
+    ". Oldest week on the left, and the last column is this week, " +
     (last.days ? "with " + last.days + " so far" : "not started yet") + ".</div>";
   return h;
 }
@@ -2689,6 +2745,7 @@ function renderDash() {
     " reps, then load.</div></div>";
 
   if (err) out += '<div class="note err">' + esc(err) + "</div>";
+  out += syncAskBanner();
 
   if (PROGRAMME.every((e) => state.loads[e.id] == null)) {
     out += '<div class="note" style="border-color:var(--accent-edge);background:var(--accent-tint)">' +
