@@ -902,9 +902,34 @@ function statusFor(exId, log) {
     else declines = 0;
   }
 
-  if (declines >= 2) return { code: "decline", label: "Declining", tone: C.bad, streak };
-  if (streak >= 3) return { code: "plateau", label: "Plateau, " + streak + " sessions", tone: C.bad, streak };
-  if (streak === 2) return { code: "stall", label: "Stall, 2 sessions", tone: C.warn, streak };
+  /*
+    Reps alone cannot tell a plateau from fatigue, and they are different
+    problems with opposite answers.
+
+    Reps stuck while reps in reserve FALL means the same output is costing
+    more: that is recovery, sleep or the deficit, and deloading the bar
+    treats the wrong thing. Reps stuck with reserve steady is a real
+    ceiling, and the bar is the thing to change.
+
+    Compared across the stall itself: reserve at the last session that
+    still gained, against now. Only called from two stalled sessions on,
+    since one is noise, and only when both ends actually recorded a
+    figure. A whole rep of reserve is the threshold, which is coarse
+    because a self-reported number deserves a coarse threshold.
+  */
+  const before = run[run.length - 1 - streak];
+  const rirDrop = (before && before.rir != null && latest.rir != null)
+    ? before.rir - latest.rir
+    : null;
+  const workingHarder = streak >= 2 && rirDrop != null && rirDrop >= 1;
+
+  if (declines >= 2) return { code: "decline", label: "Declining", tone: C.bad, streak, rirDrop };
+  if (workingHarder) {
+    return { code: "fatigue", label: "Harder for the same, " + streak + " sessions",
+             tone: C.warn, streak, rirDrop };
+  }
+  if (streak >= 3) return { code: "plateau", label: "Plateau, " + streak + " sessions", tone: C.bad, streak, rirDrop };
+  if (streak === 2) return { code: "stall", label: "Stall, 2 sessions", tone: C.warn, streak, rirDrop };
   if (streak === 1) return { code: "s1", label: "No rep gain last session", tone: C.warn, streak };
   return { code: "ok", label: "Progressing", tone: C.pb, streak: 0 };
 }
@@ -1345,8 +1370,13 @@ function renderExercise() {
     (st.code !== "new" ? pill(st.label, st.tone) : "") +
     "</div>" +
     ((st.code === "plateau" || st.code === "decline")
-      ? '<div class="body-copy" style="margin-top:12px">Three sessions without a rep gain. Options are a deload, or leaving it and watching whether other lifts in this session follow.</div>'
-      : "") +
+      ? '<div class="body-copy" style="margin-top:12px">' + st.streak +
+        " sessions without a rep gain, and your reps in reserve have held steady, so this looks like the lift rather than you. Options are a deload, or leaving it and watching whether others in this session follow.</div>"
+      : st.code === "fatigue"
+        ? '<div class="body-copy" style="margin-top:12px">Reps have not moved for ' + st.streak +
+          " sessions, but you are finishing " + st.rirDrop + " rep" + (st.rirDrop === 1 ? "" : "s") +
+          " closer to failure than when the stall began. The same work is costing more, which points at recovery, sleep or the deficit rather than at this lift. Deloading the bar would treat the wrong thing.</div>"
+        : "") +
     "</div>";
 
   // Load
@@ -2160,7 +2190,7 @@ function history() {
 
 /* ---- programme health, reusing the existing status logic ------ */
 function healthCounts() {
-  const c = { ok: 0, s1: 0, stall: 0, plateau: 0, decline: 0, new: 0 };
+  const c = { ok: 0, s1: 0, stall: 0, plateau: 0, decline: 0, fatigue: 0, new: 0 };
   PROGRAMME.forEach((e) => { c[statusFor(e.id, state.log).code]++; });
   const withLoad = PROGRAMME.filter((e) => state.loads[e.id] != null && state.peaks[e.id] != null);
   const atPeak = withLoad.filter((e) => state.loads[e.id] >= state.peaks[e.id]).length;
@@ -2807,15 +2837,26 @@ function renderDash() {
     "</div>";
 
   SESSIONS.map((s) => {
-    const bad = PROGRAMME.filter((e) => e.s === s.id).filter((e) => {
+    const stuck = PROGRAMME.filter((e) => e.s === s.id).map((e) => {
       const st = statusFor(e.id, state.log);
       const lastSet = state.log.slice().reverse().find((l) => l.exId === e.id && l.type === "set");
-      return (st.code === "plateau" || st.code === "decline") && lastSet && lastSet.ts > cutoff;
-    });
-    return { s: s, n: bad.length };
-  }).filter((c) => c.n >= 3).forEach((c) => {
-    out += '<div class="note"><strong style="color:var(--bad)">Cluster in ' + esc(c.s.name) + ".</strong> " +
-      c.n + " lifts plateaued or declining inside four weeks. That is usually recovery, sleep or the deficit rather than the exercises. Worth raising.</div>";
+      const recent = lastSet && lastSet.ts > cutoff;
+      return recent && ["plateau", "decline", "fatigue"].indexOf(st.code) >= 0 ? st : null;
+    }).filter(Boolean);
+    return { s: s, all: stuck, harder: stuck.filter((st) => st.code === "fatigue").length };
+  }).filter((c) => c.all.length >= 3).forEach((c) => {
+    /* This used to assert that a cluster was probably recovery. Now that
+       reps in reserve are read, it can tell the difference and say which,
+       instead of guessing on the reader's behalf. */
+    const mostlyFatigue = c.harder * 2 >= c.all.length;
+    out += '<div class="note"><strong style="color:' + (mostlyFatigue ? "var(--warn)" : "var(--bad)") + '">Cluster in ' +
+      esc(c.s.name) + ".</strong> " + c.all.length + " lifts stuck inside four weeks. " +
+      (mostlyFatigue
+        ? c.harder + " of them are costing you more reps in reserve than they were, so this reads as recovery, sleep or the deficit rather than the exercises. Deloading the bar would treat the wrong thing."
+        : c.harder === 0
+          ? "Reps in reserve have held steady throughout, so this looks like the lifts themselves rather than how recovered you are. A deload is the usual answer."
+          : c.harder + " of them are also costing more effort, so it is a mix. Worth looking at both the loads and the week around them.") +
+      "</div>";
   });
 
   if (g.total === 0) {
@@ -2953,6 +2994,7 @@ function renderDash() {
     '<div><div class="k">Progressing</div><div class="v" style="color:var(--pb)">' + hc.ok + "</div></div>" +
     '<div><div class="k">Stalling</div><div class="v" style="color:var(--warn)">' + (hc.s1 + hc.stall) + "</div></div>" +
     '<div><div class="k">Plateau</div><div class="v" style="color:var(--bad)">' + hc.plateau + "</div></div>" +
+    '<div><div class="k">Harder</div><div class="v" style="color:var(--warn)">' + hc.fatigue + "</div></div>" +
     '<div><div class="k">Declining</div><div class="v" style="color:var(--bad)">' + hc.decline + "</div></div>" +
     '<div><div class="k">Unlogged</div><div class="v" style="color:var(--muted)">' + hc.new + "</div></div>" +
     "</div>" +
