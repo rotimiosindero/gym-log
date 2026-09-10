@@ -1065,6 +1065,10 @@ function load() {
 
 function persist(patch) {
   state = Object.assign({}, state, patch || {});
+  /* Demo mode keeps everything in memory. Without this, logging a set to
+     see what happens would write it into the real store, and the two would
+     be impossible to tell apart afterwards. */
+  if (typeof DEMO !== "undefined" && DEMO) { err = null; return; }
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
     err = null;
@@ -1193,7 +1197,8 @@ function tabBar() {
 }
 
 function shell(inner) {
-  document.getElementById("app").innerHTML = '<div class="wrap">' + inner + "</div>" + tabBar();
+  document.getElementById("app").innerHTML =
+    '<div class="wrap">' + demoBanner() + inner + "</div>" + tabBar();
 }
 
 /* ----------------------------------------------------------------
@@ -3756,8 +3761,135 @@ const INBODY_INFO =
   "<p>The export is in pounds; everything above has been converted to kilos. Values InBody did not measure arrive as a dash and are skipped rather than read as zero. Soft lean mass is one of those, so fat-free mass above is weight minus fat mass, which is the conventional denominator anyway.</p>" +
   "<p>Scan weight is deliberately kept out of the bodyweight chart. A gym InBody and a home scale are calibrated differently and used at different times of day, so mixing them would put steps into the trend that look like weight change and are not.</p>";
 
+
+/* ================================================================
+   DEMO MODE
+
+   Reached with ?demo=1, for showing someone the app with something in
+   it, or for checking a layout against a full year of data.
+
+   Two rules, both enforced rather than intended:
+
+     Nothing here is real. Every figure is generated, including the body
+     composition scan, so this can be opened by anyone without exposing
+     a single measurement.
+
+     Nothing is written. persist() becomes a no-op, so a session logged
+     out of curiosity cannot end up mixed into the real log. The page
+     says so on every screen, because a demo that looks exactly like the
+     real thing is a good way to lose real data.
+================================================================= */
+
+/* let rather than const so the no-write guarantee below can actually be
+   exercised in a test harness; nothing in the app reassigns it. */
+let DEMO = /(^|[?&#])demo=1(&|$)/.test(location.search + location.hash);
+
+function demoBanner() {
+  if (!DEMO) return "";
+  return '<div class="note" style="border-color:rgba(224,167,63,0.5);background:rgba(224,167,63,0.09)">' +
+    '<strong style="color:var(--warn)">Demo data.</strong> Every number on this page is invented, and nothing you do here is saved. ' +
+    '<a href="' + esc(location.pathname) + '" style="color:var(--accent)">Open the real app</a></div>';
+}
+
+/** A believable year: progression, a couple of missed weeks, a deload,
+ *  a slow cut, and one body composition scan. All invented. */
+function demoState() {
+  const t = today();
+  const shift = (n) => addDays(t, n);
+  const plan = { lowerA: 0, upperA: 1, lowerB: 3, upperB: 4, grip: 5 };
+  const weeks = 30;
+  /* how many of the five got done each week, oldest first */
+  const attendance = [4,5,5,3,5,5,4,5,0,5,5,4,5,5,2,5,4,5,5,5,3,5,5,4,5,5,1,5,4,2];
+
+  const base = {}, loads = {}, peaks = {}, log = [];
+  let ts = Date.now() - weeks * 7 * 864e5;
+
+  /* base stays fixed and every week's load is computed from it. Deriving the
+     next load from the previous one instead fed the week's increments back
+     in on top of themselves, which compounded into a 567% gain.
+
+     The eleven lifts that feed the strength score get explicit figures,
+     because a hash of the exercise id produced things like a 117kg dumbbell
+     and pinned every group at 100, which misrepresents the app rather than
+     demonstrating it. Everything else scales off its own increment, which
+     tracks how heavy a lift is well enough for a demo: a leg press moves in
+     10s, a cable fly in halves. All invented. */
+  const DEMO_BASE = {
+    ua2: 70, ua11: 55, ua4: 22, ub1: 26, ua9: 18, ub12: 15,
+    la2: 100, lb3: 70, lb4: 70, lb5: 26,
+  };
+  PROGRAMME.forEach((e) => {
+    base[e.id] = e.unit === "bw" ? 0
+      : DEMO_BASE[e.id] != null ? DEMO_BASE[e.id]
+      : e.unit === "pin" ? Math.max(4, Math.round((e.inc || 1) * 12))
+      : Math.round((e.inc || 2.5) * 14);
+    loads[e.id] = base[e.id]; peaks[e.id] = base[e.id];
+  });
+
+  for (let w = 0; w < weeks; w++) {
+    const monday = -7 * (weeks - 1 - w) - ((parseD(t).getDay() + 6) % 7);
+    const doing = Object.keys(plan).slice(0, attendance[w]);
+    doing.forEach((sid) => {
+      const date = shift(monday + plan[sid]);
+      if (date > t) return;
+      PROGRAMME.filter((e) => e.s === sid && !e.opt).forEach((e) => {
+        /* Add reps until the top of the range, then load, then start again.
+           A deload around week 20 so the charts are not a straight line. */
+        const span = e.hi - e.lo + 2;
+        const cycle = w % span;
+        /* One load increase every two rep-range cycles. One per cycle put the
+           demo at +61% over seven months, which nobody achieves; this lands
+           nearer +30%, and the percentage is dominated by the small-increment
+           lifts either way, since 2.5kg on a curl is a far bigger relative
+           jump than 5kg on a deadlift. */
+        const bumps = Math.floor(w / (span * 2));
+        const deload = w >= 20 && w < 22 ? -(e.inc || 0) : 0;
+        const load = e.unit === "bw" ? 0
+          : Math.max(e.inc || 1, base[e.id] + bumps * (e.inc || 0) + deload);
+        const reps = Math.min(e.hi, e.lo + cycle);
+        log.push({
+          type: "set", exId: e.id, date: date, ts: ts += 9e5,
+          load: Number(load.toFixed(2)),
+          reps: Array.from({ length: e.sets }, (_, i) => Math.max(1, reps - (i > 1 ? 1 : 0))),
+          rir: w >= 18 && w < 22 ? 0 : 2,          // effort creeps up before the deload
+          formReset: false, note: "", flags: [], synced: w < weeks - 2,
+        });
+        if (e.unit !== "bw") { loads[e.id] = load; peaks[e.id] = Math.max(peaks[e.id], load); }
+      });
+    });
+  }
+
+  const bw = [];
+  for (let i = weeks; i >= 0; i--) {
+    bw.push({ date: shift(-7 * i - 1), kg: Number((88.0 - (weeks - i) * 0.09 + Math.sin(i / 2.5) * 0.35).toFixed(1)), ts: 1 });
+  }
+
+  const whoop = [];
+  for (let i = 45; i >= 0; i--) {
+    const wob = Math.sin(i / 3.4);
+    whoop.push({
+      date: shift(-i), recovery: Math.round(63 + wob * 18), hrv: Math.round(70 + wob * 12),
+      rhr: Math.round(53 - wob * 3), sleep: Number((7.2 + wob * 0.8).toFixed(1)),
+      strain: Number((12.1 + Math.sin(i / 2.2) * 3.2).toFixed(1)), ts: 1,
+    });
+  }
+
+  /* An invented scan. Deliberately nothing like anyone's real figures. */
+  const inbody = [
+    { date: shift(-96), at: "20260601090000", ts: 1, weight: 88.0, smm: 40.9, fat: 15.2, ffm: 72.8,
+      pbf: 17.3, bmi: 26.9, bmrKcal: 1902, score: 84, visceral: 8, tbw: 53.0, smi: 8.6, phase: 6.8,
+      leanArmR: 4.31, leanArmL: 4.24, leanTrunk: 32.6, leanLegR: 9.92, leanLegL: 9.71, heightM: 1.808 },
+    { date: shift(-6), at: "20260904090000", ts: 2, weight: 85.4, smm: 42.1, fat: 11.9, ffm: 73.5,
+      pbf: 13.9, bmi: 26.1, bmrKcal: 1944, score: 90, visceral: 5, tbw: 53.4, smi: 9.0, phase: 7.2,
+      leanArmR: 4.52, leanArmL: 4.47, leanTrunk: 33.1, leanLegR: 10.21, leanLegL: 10.08, heightM: 1.808 },
+  ];
+
+  return { loads, peaks, log, bw, whoop, inbody };
+}
+
 /* ---- boot ---- */
 load();
+if (DEMO) { state = Object.assign({}, state, demoState(), { pendingSync: null }); }
 render();
 </script>
 </body>
