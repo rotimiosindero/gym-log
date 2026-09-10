@@ -661,7 +661,7 @@ const PROGRAMME = [
   { id: "lb3", s: "lowerB", name: "Zercher squat", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
   { id: "lb4", s: "lowerB", name: "Romanian deadlift", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
   { id: "lb5", s: "lowerB", name: "Romanian deadlift, DB", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
-  { id: "lb6", s: "lowerB", name: "Calves", unit: "kg", sets: 3, lo: 8, hi: 10, inc: 5 },
+  { id: "lb6", s: "lowerB", name: "Calves", unit: "kg", sets: 3, lo: 12, hi: 15, inc: 5 },
   { id: "lb7", s: "lowerB", name: "Abductor (out)", unit: "pin", sets: 4, lo: 8, hi: 10, inc: 1 },
 
   // ---- Upper B
@@ -1892,7 +1892,15 @@ function entryE1(ex, l) {
   const reps = Math.max.apply(null, l.reps);
   if (reps <= 0) return 0;
   if (ex.unit === "bw") return reps;
-  return l.load * (1 + Math.min(reps, REP_CAP) / 30);
+  /* Epley drifts past about 12 reps, hence the cap. But capping below what
+     the programme prescribes made every rep in a 12 to 15 range score the
+     same, so gaining reps on a calf raise showed no progress at all until
+     the load moved. A set the programme asks for is a set worth counting.
+     Progress is a ratio against the same lift's own baseline, so the drift
+     cancels; the strength standard keeps the strict cap, and every lift
+     feeding it works in 6 to 8 anyway. */
+  const cap = Math.max(REP_CAP, ex.hi || 0);
+  return l.load * (1 + Math.min(reps, cap) / 30);
 }
 
 /** The baseline a lift is measured against: the first set you ever logged for
