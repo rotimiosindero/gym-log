@@ -552,9 +552,20 @@
   .weeks .wk { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
   .weeks .wk i { display: block; height: 9px; border-radius: 1px; background: var(--accent); }
   .weeks .wk i.empty { background: var(--panel2); }
-  .wk-axis { display: flex; gap: 3px; margin-top: 6px; }
-  .wk-axis span { flex: 1 1 0; min-width: 0; font-size: 10px; color: var(--muted); white-space: nowrap; }
-  .wk-axis span:last-child { text-align: right; }
+  .weeks .wk.now i.empty { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+  .weeks .wk.picked i.empty { background: var(--line); }
+  .weeks .wk.picked i { background: var(--text); }
+
+  .wk-months { display: flex; gap: 3px; margin-top: 7px; }
+  .wk-months span {
+    flex: 1 1 0; min-width: 0; font-size: 9.5px; letter-spacing: 0.04em;
+    color: var(--muted); white-space: nowrap;
+  }
+  .wk-readout {
+    margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  .wk-readout b { color: var(--text); font-size: 15px; font-weight: 700; }
 
   .kv { display: flex; gap: 22px; flex-wrap: wrap; }
   .kv > div { min-width: 62px; }
@@ -2288,17 +2299,64 @@ function radarChart(vals, o) {
 
 /** Sessions per week as a stack of blocks, one block per session. Reads as
  *  a count rather than a length, which is what a session is. */
+/** Which week's column was last tapped, so the readout can name it. */
+let weekPick = null;
+
+function pickWeek(el) {
+  weekPick = { week: el.getAttribute("data-week"), days: Number(el.getAttribute("data-days")) };
+  render();
+}
+window.pickWeek = pickWeek;
+
+/**
+ * One column per week, one block per session.
+ *
+ * It used to carry nothing but the blocks and the first and last dates,
+ * which left the reader counting squares to find a number and unable to
+ * tell which week any column was. Now it says what a block means, marks
+ * where the months change, and a tap on any column reads it out. The
+ * hover title it used to rely on does nothing at all on a phone.
+ */
 function weeksStrip(buckets) {
-  const maxRows = Math.max(4, Math.max.apply(null, buckets.map((b) => b.days)));
+  const counts = buckets.map((b) => b.days);
+  const maxRows = Math.max(3, Math.max.apply(null, counts));
+  const last = buckets[buckets.length - 1];
+
   let h = '<div class="weeks">';
-  buckets.forEach((b) => {
-    h += '<div class="wk" title="' + esc(fmtDay(b.week)) + ", " + b.days + ' session(s)">';
-    for (let i = 0; i < maxRows; i++) h += "<i" + (i < b.days ? "" : ' class="empty"') + "></i>";
+  buckets.forEach((b, i) => {
+    const isNow = i === buckets.length - 1;
+    const picked = weekPick && weekPick.week === b.week;
+    h += '<div class="wk' + (isNow ? " now" : "") + (picked ? " picked" : "") +
+      '" data-week="' + esc(b.week) + '" data-days="' + b.days + '" onclick="pickWeek(this)">';
+    for (let r = 0; r < maxRows; r++) h += "<i" + (r < b.days ? "" : ' class="empty"') + "></i>";
     h += "</div>";
   });
   h += "</div>";
-  h += '<div class="wk-axis"><span>' + esc(fmtDay(buckets[0].week)) + "</span><span>" +
-    esc(fmtDay(buckets[buckets.length - 1].week)) + "</span></div>";
+
+  /* Month markers where the month actually turns over, instead of two bare
+     dates at the ends that told you nothing about the columns between. */
+  h += '<div class="wk-months">';
+  let lastLabelAt = -99;
+  buckets.forEach((b, i) => {
+    const m = parseD(b.week).getMonth();
+    const prev = i ? parseD(buckets[i - 1].week).getMonth() : null;
+    /* A column is only about 19px wide, so two labels within three columns
+       of each other collide. The month that turns over first wins. */
+    const turns = i === 0 || m !== prev;
+    const room = i - lastLabelAt >= 3;
+    if (turns && room) { lastLabelAt = i; h += "<span>" + esc(MONTHS[m]) + "</span>"; }
+    else h += "<span></span>";
+  });
+  h += "</div>";
+
+  const pick = weekPick && buckets.some((b) => b.week === weekPick.week) ? weekPick : null;
+  h += '<div class="wk-readout">' +
+    (pick
+      ? "<b>" + pick.days + "</b> session" + (pick.days === 1 ? "" : "s") + " in the week of " + esc(fmtDay(pick.week))
+      : "Each block is one session. Tap a week to read it.") +
+    "</div>";
+  h += '<div class="hint">Oldest week on the left. The last column is this week, ' +
+    (last.days ? "with " + last.days + " so far" : "not started yet") + ".</div>";
   return h;
 }
 
