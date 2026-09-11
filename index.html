@@ -322,6 +322,11 @@
     border-radius: 999px;
     font-size: 12.5px;
   }
+  .btn-mini.solid {
+    background: var(--accent); border-color: var(--accent);
+    color: var(--ink); font-weight: 600;
+  }
+  .suggest.down .btn-mini.solid { background: var(--warn); border-color: var(--warn); }
 
   .btn-back {
     background: none;
@@ -502,6 +507,90 @@
   .tile-foot { font-size: 12px; color: var(--muted); margin-top: 9px; line-height: 1.5; }
   .tile-foot .up { color: var(--pb); font-weight: 600; }
   .tile-foot .dn { color: var(--bad); font-weight: 600; }
+  /* A tile that goes somewhere. The chevron sits bottom right, clear of
+     the sparkline in the top right, so both can be on the same tile. */
+  .tile.tap {
+    -webkit-appearance: none; appearance: none; margin: 0;
+    display: block; width: 100%; text-align: left;
+    font: inherit; color: inherit; cursor: pointer;
+  }
+  .tile.tap:active { background: var(--panel2); }
+  .tile.tap.lead:active { background: var(--panel); }
+  .tile.tap::after {
+    content: "\203a"; position: absolute; right: 14px; bottom: 9px;
+    font-size: 17px; line-height: 1; color: var(--muted); opacity: 0.5;
+  }
+  .tile.tap .tile-foot { padding-right: 15px; }
+
+  /* The next-load suggestion. Accent edge so it reads as the app offering
+     something rather than reporting something, which the panels do. */
+  .suggest {
+    border: 1px solid var(--accent-edge); background: var(--accent-tint);
+    border-radius: 5px; padding: 15px 16px; margin-bottom: 14px;
+  }
+  .suggest.down { border-color: var(--warn-edge); background: var(--warn-tint); }
+  .suggest-row { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+  .suggest-val {
+    font-size: 34px; font-weight: 700; line-height: 1;
+    letter-spacing: -1px; color: var(--accent);
+  }
+  .suggest.down .suggest-val { color: var(--warn); }
+  .suggest-val span { font-size: 14px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .suggest-step { font-size: 13px; color: var(--muted); }
+  .suggest-why { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-top: 11px; }
+
+  /* A panel heading that is itself the way in to a fuller page. */
+  .panel-link {
+    -webkit-appearance: none; appearance: none;
+    display: flex; width: 100%; align-items: center; justify-content: space-between;
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; color: inherit; cursor: pointer;
+  }
+  .panel-link:active { opacity: 0.6; }
+  .panel-link .chev { font-size: 17px; line-height: 1; color: var(--muted); opacity: 0.55; }
+  .panel-link .chev.fold { transition: transform 0.15s ease; }
+  .panel-link .chev.fold.open { transform: rotate(90deg); }
+
+  /* One lift per line on the programme health page. */
+  .hrow {
+    -webkit-appearance: none; appearance: none;
+    display: flex; width: 100%; align-items: baseline; justify-content: space-between;
+    gap: 12px; padding: 11px 0; margin: 0;
+    background: none; border: none; border-bottom: 1px solid var(--line);
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+  }
+  .hrow:last-child { border-bottom: none; }
+  .hrow:active { opacity: 0.55; }
+  .hrow-name { font-size: 14px; color: var(--text); min-width: 0; }
+  .hrow-name em { display: block; font-style: normal; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .hrow-val { font-size: 13px; white-space: nowrap; text-align: right; }
+  .hrow-val b { display: block; font-weight: 600; font-size: 14px; }
+  .hrow-val span { font-size: 11.5px; color: var(--muted); }
+
+  .btn-mini.warn { border-color: var(--warn-edge); color: var(--warn); }
+
+  /* Session edit mode: a reorderable list, a handle wide enough for a
+     thumb, and a row that lifts while it is being dragged. */
+  .edit-list { margin-bottom: 4px; }
+  .edit-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+    background: var(--panel); position: relative;
+  }
+  .edit-row:last-child { border-bottom: none; }
+  .edit-row.dragging {
+    z-index: 5; box-shadow: var(--shadow); border-radius: 4px;
+    background: var(--panel2);
+  }
+  .drag-handle {
+    font-size: 19px; line-height: 1; color: var(--muted);
+    padding: 8px 4px; touch-action: none; cursor: grab; flex: 0 0 auto;
+  }
+  .edit-name { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+  .edit-name em {
+    display: block; font-style: normal; font-size: 11.5px;
+    color: var(--muted); margin-top: 2px;
+  }
 
   .mg-row {
     display: flex; align-items: center; gap: 10px;
@@ -632,7 +721,13 @@ const SESSIONS = [
    in your browser, alongside everything else you log. A public repository
    should not carry how much you lift. Set counts, rep ranges and increments
    stay: they are how the programme is shaped, not how strong you are. */
-const PROGRAMME = [
+/* This array is the shipped programme, not the whole of it: a device that
+   has added its own exercises under Setup > Exercises carries them
+   separately, in state.plan.custom, and rebuildProgramme() below merges the
+   two into the PROGRAMME everything else in the app actually reads. Keeping
+   this one a plain shipped list means it stays a clean mirror of Gym.md,
+   with nothing device-specific written into the source. */
+const BASE_PROGRAMME = [
   // ---- Lower A
   { id: "la1", s: "lowerA", name: "Leg press", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 10 },
   { id: "la2", s: "lowerA", name: "Trap bar deadlift", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
@@ -694,7 +789,11 @@ const PROGRAMME = [
   { id: "g11", s: "grip", name: "Neck contraction", unit: "kg", sets: 3, lo: 8, hi: 10, inc: 2.5 },
 ];
 
-const BY_ID = Object.fromEntries(PROGRAMME.map((e) => [e.id, e]));
+/* PROGRAMME and BY_ID are reassigned once state loads, by rebuildProgramme()
+   below, to fold in any custom exercises. Declared here so every function
+   below that closes over them keeps reading whatever they were last set to. */
+let PROGRAMME = BASE_PROGRAMME;
+let BY_ID = Object.fromEntries(PROGRAMME.map((e) => [e.id, e]));
 
 /* ----------------------------------------------------------------
    Muscle groups.
@@ -808,11 +907,41 @@ const STD = {
    of two, so it is a setting rather than a guess. */
 const DB_LIFTS = { ua4: 1, ub1: 1, lb5: 1, g2: 1, g3: 1, g6: 1 };
 
-PROGRAMME.forEach((e) => {
-  e.mg = MG_MAP[e.id] || "core";
-  e.std = STD[e.id] || null;
-  e.db = !!DB_LIFTS[e.id];
-});
+/** Tags one exercise with its muscle group, strength-standard ratio and
+ *  dumbbell-per-unit flag. A custom exercise arrives with `mg` already
+ *  chosen by whoever added it, which the `||` here leaves alone; a shipped
+ *  one has none, so it falls through to the lookup tables above. Neither
+ *  path lets a lift silently land in "core": PROGRAMME.forEach below is the
+ *  only caller, and the custom-exercise form requires a group before it
+ *  will let you save.
+ *
+ *  std and db work the same way, through stdSelf/dbSelf rather than std/db
+ *  directly, because both get overwritten on every call: a shipped lift
+ *  falls through STD/DB_LIFTS every time, which only works if "already
+ *  tagged" is remembered somewhere those two lookups cannot clobber. A
+ *  free-weight custom exercise CAN feed the strength standard, exactly
+ *  like a shipped barbell or dumbbell lift; the add-exercise form is what
+ *  actually decides whether stdSelf carries a ratio or null, and that
+ *  ratio is always the person's own estimate, never one this app invents
+ *  on their behalf, same as every other number in STD. */
+function tagExercise(e) {
+  e.mg = e.mg || MG_MAP[e.id] || "core";
+  e.std = e.stdSelf !== undefined ? e.stdSelf : (STD[e.id] || null);
+  e.db = e.dbSelf !== undefined ? e.dbSelf : !!DB_LIFTS[e.id];
+}
+BASE_PROGRAMME.forEach(tagExercise);
+
+/** Folds this device's custom exercises into the shipped programme. Runs
+ *  once at boot and again whenever the custom list itself changes, adding
+ *  or removing a lift. Benching and reordering do not call this: neither
+ *  changes which exercises exist, only how they are shown, and both are
+ *  read directly off state.plan at render time instead. */
+function rebuildProgramme() {
+  const custom = (state.plan && state.plan.custom) || [];
+  PROGRAMME = BASE_PROGRAMME.concat(custom);
+  PROGRAMME.forEach(tagExercise);
+  BY_ID = Object.fromEntries(PROGRAMME.map((e) => [e.id, e]));
+}
 
 const MG_OF = (exId) => (BY_ID[exId] ? BY_ID[exId].mg : null);
 
@@ -836,7 +965,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.0 \u00b7 body composition";
+const VERSION = "2.2 \u00b7 exercise rotation";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -934,6 +1063,128 @@ function statusFor(exId, log) {
   return { code: "ok", label: "Progressing", tone: C.pb, streak: 0 };
 }
 
+/* ==================================================================
+   WHAT LOAD TO MOVE TO NEXT
+
+   Double progression says fill the rep range, then add weight. It is
+   silent on how much weight, and the usual advice, add the smallest
+   plate, treats two different sessions as though they were the same
+   one. Eight reps with three still in reserve and eight reps grinding
+   are not equivalent evidence. Adding 2.5kg to both means one of them
+   crawls for a month while the other stalls.
+
+   So this works backwards from the reps you logged rather than forwards
+   from a rule. Take the best set, turn it into an estimated one-rep max,
+   then ask what load that max would put you at the BOTTOM of the range
+   with, since the bottom of the range is where a new working weight is
+   meant to land you. Round to the step the lift actually moves in.
+
+   Reps in reserve go into the estimate rather than into a second rule:
+   eight reps with two left is evidence of a ten-rep load, so it counts
+   as ten. That is the whole method.
+
+   The arithmetic is ordinary on purpose. There is no model here, no
+   server and no training data: it runs offline in the gym like the rest
+   of this app, and every figure it prints can be reproduced with a
+   calculator from the numbers on the same screen. For this particular
+   job that is worth more than sophistication would be, because a wrong
+   answer is a bar you cannot lift, and you need to be able to see why
+   it said what it said before you load the plates.
+
+   Three guard rails. Never more than two steps in one move. Never more
+   than a tenth of the load in one move. And no suggestion at all while
+   you are mid-range, because the answer there is more reps.
+================================================================== */
+const SUGGEST_STEPS = 2;     // most steps of the bar to move at once
+const SUGGEST_UP = 0.10;     // most to add, as a fraction of the current load
+const SUGGEST_DOWN = 0.15;   // most to take off; coming down is the safe direction
+
+/** The inverse of pinToKg, for putting a suggestion back into pin numbers.
+ *  Add-on plates are left out of the return trip on purpose: suggesting
+ *  "13+" would be a precision this estimate does not have. */
+function kgToPin(ex, kg) {
+  const c = (state.settings.pins || {})[ex.id];
+  if (!c || c.p1 == null || !(c.step > 0)) return null;
+  const stack = c.half ? kg * 2 : kg;
+  return (stack - c.p1) / c.step + 1;
+}
+
+/** null unless the range was clearly filled or clearly missed. */
+function suggestLoad(ex, reps, rir, load) {
+  if (!ex || !reps || !reps.length) return null;
+  if (ex.unit === "bw") return null;        // nothing to add weight to
+  if (ex.repUnit === "sec") return null;    // Epley on a timed hold means nothing
+  if (!(load > 0)) return null;
+  const inc = ex.inc || 0;
+  if (!(inc > 0)) return null;
+
+  const best = Math.max.apply(null, reps);
+  if (!(best > 0)) return null;
+  const allTop = reps.every((r) => r >= ex.hi);
+  const allUnder = reps.every((r) => r < ex.lo);
+  if (!allTop && !allUnder) return null;
+  const dir = allTop ? 1 : -1;
+
+  /* A cable pin is not linear in kilos, so the ratio maths needs the stack
+     measured first. Uncalibrated, this falls back to a single step, which
+     is what the programme said before any of it existed. */
+  const kg = ex.unit === "pin" ? pinToKg(ex, load) : load;
+  const flat = kg == null || !(ex.hi > ex.lo);
+
+  /* Two figures, not one: what the reps asked for, and what the guard
+     rails will actually hand over. Only the gap between them is worth
+     saying out loud, and it is a real gap only when the rails made the
+     move SMALLER. When one increment is already more than a tenth of the
+     load, as it is on a light dumbbell, the move overshoots the estimate
+     instead, and calling that capped would have it apologising for being
+     generous. */
+  let units, wantUnits;
+  if (flat) {
+    units = wantUnits = dir * inc;
+  } else {
+    const eff = allTop ? best + (rir == null ? 0 : rir) : best;
+    const e1 = kg * (1 + Math.min(eff, Math.max(REP_CAP, ex.hi)) / 30);
+    const raw = e1 / (1 + ex.lo / 30) - kg;
+    const lim = dir > 0 ? kg * SUGGEST_UP : -kg * SUGGEST_DOWN;
+    const held = dir > 0 ? Math.min(raw, lim) : Math.max(raw, lim);
+    const toUnits = (d) => (ex.unit === "pin" ? kgToPin(ex, kg + d) - load : d);
+    units = toUnits(held);
+    wantUnits = toUnits(raw);
+  }
+
+  let steps = Math.round(Math.abs(units) / inc);
+  if (steps > SUGGEST_STEPS) steps = SUGGEST_STEPS;
+  if (steps < 1) steps = 1;
+  const next = Number((load + dir * steps * inc).toFixed(2));
+  if (next <= 0) return null;
+
+  return { dir: dir, load: next, steps: steps, from: load, best: best,
+           rir: rir, flat: flat, uncal: kg == null,
+           capped: Math.abs(wantUnits) / inc > steps + 0.5 };
+}
+
+/** The suggestion in words. Lives next to the maths so the two cannot drift. */
+function suggestWhy(ex, sg) {
+  const from = fmtLoad(ex, sg.from), to = fmtLoad(ex, sg.load);
+  if (sg.dir < 0) {
+    return "Every set came in under " + ex.lo + " at " + from + ", so the load is ahead of you. " + to +
+      " should bring the range back. If that was one bad day rather than too much weight, ignore this and run " + from + " again.";
+  }
+  if (sg.uncal) {
+    return "Every set at the top of the range, so one pin up. Measure this stack on Setup and the size of the step can be worked out from your reps instead of assumed.";
+  }
+  if (sg.flat) {
+    return "Every set at " + ex.hi + ", and this lift has a single rep target rather than a range, so it moves one step to " + to + ".";
+  }
+  const r = sg.rir == null ? 0 : sg.rir;
+  return "You finished " + sg.best + " at " + from +
+    (r > 0
+      ? " with " + r + " rep" + (r === 1 ? "" : "s") + " still in reserve, which is evidence of a " + (sg.best + r) + "-rep load"
+      : " with nothing left in reserve") +
+    ". " + to + " should put you back near " + ex.lo + "." +
+    (sg.capped ? " Held to " + sg.steps + " step" + (sg.steps === 1 ? "" : "s") + ", because the reps implied more than that, so expect to move again soon." : "");
+}
+
 /**
  * Renders entries as pipe-delimited markdown lines matching the format
  * defined in Gym-Tracker.md, grouped by date and session so it drops
@@ -1025,6 +1276,7 @@ async function copyText(text) {
    State
 ------------------------------------------------------------------*/
 let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [], inbody: [], pendingSync: null,
+  plan: { off: {}, order: {}, custom: [] },
   settings: { vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 } };
 let view = { page: "home" };
 let err = null;
@@ -1037,6 +1289,7 @@ let exportOpen = false;
    asked, nothing was ever marked synced, and the banner nagged forever. */
 let infoOpen = null;      // which panel has its explanation open, if any
 let bodySeg = "weight";   // Body tab segment: weight | composition | recovery
+let sessionEdit = false;  // whether the current session page is in Edit exercises mode
 
 function load() {
   let saved = null;
@@ -1059,7 +1312,13 @@ function load() {
     whoop: ((saved && saved.whoop) || []).filter((r) => r && r.date),
     inbody: ((saved && saved.inbody) || []).filter((r) => r && r.date && r.at),
     pendingSync: (saved && saved.pendingSync) || null,
-    settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125 }, (saved && saved.settings) || {}),
+    /* off: { exId: dateBenchedISO }. order: { sessionId: [exId in display order] }.
+       custom: exercise objects the device added itself, same shape as one in
+       BASE_PROGRAMME. All three live outside settings because they are data
+       about the programme, not a preference, and all three travel in the
+       JSON backup for exactly that reason. */
+    plan: Object.assign({ off: {}, order: {}, custom: [] }, (saved && saved.plan) || {}),
+    settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null }, (saved && saved.settings) || {}),
   };
 }
 
@@ -1092,6 +1351,7 @@ function go(next) {
   draft = null;
   exportOpen = false;
   infoOpen = null;
+  sessionEdit = false;
   window.scrollTo(0, 0);
   render();
 }
@@ -1105,6 +1365,38 @@ function panelHead(label, key) {
   return '<div class="panel-head"><div class="panel-label">' + esc(label) + "</div>" +
     (key ? '<button class="info-btn" aria-expanded="' + (infoOpen === key ? "true" : "false") +
       '" aria-label="Explain this panel" onclick="toggleInfo(\'' + key + '\')">i</button>' : "") +
+    "</div>";
+}
+
+/** A panel heading that is the way in to a fuller page. */
+function panelLink(label, onclick) {
+  return '<button class="panel-link" onclick="' + onclick + '">' +
+    '<span class="panel-label">' + esc(label) + '</span><span class="chev">\u203a</span></button>';
+}
+
+/* A panel you can put away. The long lists of raw entries are worth
+   keeping and not worth scrolling past every visit, so they fold, and the
+   choice is stored rather than reset on every launch: it is a preference
+   about the page, not a state of this particular visit. */
+const isFolded = (k) => !!(state.settings.folded || {})[k];
+
+function toggleFold(k) {
+  const f = Object.assign({}, state.settings.folded || {});
+  if (f[k]) delete f[k]; else f[k] = 1;
+  setSetting("folded", f);
+  render();
+}
+window.toggleFold = toggleFold;
+
+function foldPanel(key, label, body, sub) {
+  const open = !isFolded(key);
+  return '<div class="panel">' +
+    '<button class="panel-link" aria-expanded="' + (open ? "true" : "false") +
+    '" onclick="toggleFold(\'' + key + '\')">' +
+    '<span class="panel-label">' + esc(label) + "</span>" +
+    '<span class="chev fold' + (open ? " open" : "") + '">\u203a</span></button>' +
+    (open ? '<div style="margin-top:8px">' + body + "</div>"
+          : '<div class="hint" style="margin-top:8px">' + esc(sub || "Tap to show.") + "</div>") +
     "</div>";
 }
 
@@ -1181,6 +1473,7 @@ function activeTabKey() {
   const p = view.page;
   if (p === "home") return "home";
   if (p === "sessions" || p === "session" || p === "exercise") return "log";
+  if (p === "health") return "home";
   if (p === "trends") return "trends";
   if (p === "body") return "body";
   if (p === "settings" || p === "pins") return "setup";
@@ -1228,6 +1521,7 @@ function render() {
   if (view.page === "session") return renderSession();
   if (view.page === "exercise") return renderExercise();
   if (view.page === "pb") return renderPB();
+  if (view.page === "health") return renderHealth();
   if (view.page === "log") return renderLog();
   if (view.page === "sync") return renderSync();
   if (view.page === "trends") return renderTrends();
@@ -1245,6 +1539,43 @@ function sessionGap(sid) {
   return n === 0 ? "done today" : n === 1 ? "done yesterday" : "last done " + n + " days ago";
 }
 
+/* ==================================================================
+   EXERCISE ROTATION
+
+   The programme is one fixed list; what you actually do session to
+   session is not, so state.plan holds three things on top of it, none
+   of which ever touch PROGRAMME's own history:
+
+     off     { exId: dateBenchedISO }   hidden from the session, not deleted
+     order   { sessionId: [exId, ...] } this device's own running order
+     custom  [ exercise, ... ]          lifts this device added itself
+
+   Benching is presentational only, on purpose. A benched lift keeps every
+   set it ever logged, keeps counting in Progress, Strength and Programme
+   health exactly as before, and only disappears from the list you tap
+   through in a normal (non-edit) visit to the session. Restoring it is
+   just removing the date, nothing to rebuild.
+------------------------------------------------------------------*/
+
+/** The exercises in a session, in this device's order. Order names
+ *  whatever ids it knows about; anything it does not, a lift added since
+ *  the last reorder, keeps its natural place in PROGRAMME at the end,
+ *  so a fresh install with no order set behaves exactly as before. */
+function sessionExercises(sid, opts) {
+  opts = opts || {};
+  const all = PROGRAMME.filter((e) => e.s === sid);
+  const order = (state.plan.order || {})[sid];
+  const ranked = order
+    ? all.slice().sort((a, b) => {
+        const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+        const ra = ia === -1 ? 1e9 + all.indexOf(a) : ia;
+        const rb = ib === -1 ? 1e9 + all.indexOf(b) : ib;
+        return ra - rb;
+      })
+    : all;
+  return opts.includeOff ? ranked : ranked.filter((e) => !(state.plan.off || {})[e.id]);
+}
+
 /** The session picker. This was the landing page until the dashboard took
  *  that job; it is now one tap away and keeps the flagged-lift pills, which
  *  are what you actually want when choosing what to train. */
@@ -1259,7 +1590,7 @@ function renderSessions() {
   h += syncBanner();
 
   SESSIONS.forEach((s) => {
-    const exs = PROGRAMME.filter((e) => e.s === s.id);
+    const exs = sessionExercises(s.id);
     const flagged = exs.filter((e) => ["stall", "plateau", "decline"].indexOf(statusFor(e.id, state.log).code) >= 0).length;
     h += '<button class="card" onclick="go({page:\'session\',sid:\'' + s.id + '\'})">' +
       '<div class="row"><div>' +
@@ -1294,10 +1625,25 @@ function renderSessions() {
 
 function renderSession() {
   const s = SESSIONS.find((x) => x.id === view.sid);
-  const exs = PROGRAMME.filter((e) => e.s === s.id);
   const p = pending().filter((l) => BY_ID[l.exId] && BY_ID[l.exId].s === s.id);
 
   let h = backBar("go({page:'sessions'})", s.name, sessionGap(s.id));
+
+  h += '<div class="stack" style="margin-bottom:14px;justify-content:flex-end">' +
+    '<button class="btn-mini' + (sessionEdit ? " solid" : "") + '" onclick="toggleSessionEdit()">' +
+    (sessionEdit ? "Done editing" : "Edit exercises") + "</button></div>";
+
+  if (sessionEdit) {
+    h += renderSessionEdit(s);
+    shell(h);
+    return;
+  }
+
+  const exs = sessionExercises(s.id);
+  if (!exs.length) {
+    h += '<div class="panel"><div class="body-copy">Every exercise here is benched. ' +
+      '<button class="btn-mini" style="margin-top:8px" onclick="toggleSessionEdit()">Edit exercises</button> to bring one back.</div></div>';
+  }
 
   exs.forEach((e) => {
     const st = statusFor(e.id, state.log);
@@ -1328,6 +1674,252 @@ function renderSession() {
   shell(h);
 }
 
+function toggleSessionEdit() { sessionEdit = !sessionEdit; render(); }
+window.toggleSessionEdit = toggleSessionEdit;
+
+/** The label for a muscle or support group, wherever it lives. */
+function groupLabel(mg) {
+  return (MG[mg] && MG[mg].label) || (SUPPORT[mg] && SUPPORT[mg].label) || mg;
+}
+
+function renderSessionEdit(s) {
+  const offMap = state.plan.off || {};
+  const active = sessionExercises(s.id);
+  const off = PROGRAMME.filter((e) => e.s === s.id && offMap[e.id])
+    .sort((a, b) => String(offMap[a.id]).localeCompare(String(offMap[b.id])));
+
+  let h = '<div class="panel"><div class="body-copy">' +
+    "Drag the handle to reorder. Benching hides a lift from this session without touching a single logged set: it keeps counting in Progress, Strength and Programme health exactly as before, only re-attaining it needs a trip back here." +
+    "</div></div>";
+
+  h += '<div class="panel"><div class="edit-list" data-sid="' + esc(s.id) + '">';
+  if (active.length) {
+    active.forEach((e) => {
+      h += '<div class="edit-row" data-id="' + esc(e.id) + '">' +
+        '<span class="drag-handle" aria-hidden="true">≡</span>' +
+        '<span class="edit-name">' + esc(e.name) + (e.opt ? ' <span class="opt">(if time)</span>' : "") +
+        '<em>' + e.sets + " × " + e.lo + "–" + e.hi + " · " + esc(groupLabel(e.mg)) + '</em></span>' +
+        '<button class="btn-mini" onclick="benchExercise(\'' + e.id + '\')">Bench</button>' +
+        "</div>";
+    });
+  } else {
+    h += '<div class="hint">Nothing active here. Restore one below, or add a new one.</div>';
+  }
+  h += "</div></div>";
+
+  if (off.length) {
+    h += '<div class="panel"><div class="panel-label">Benched</div>';
+    off.forEach((e) => {
+      const logged = state.log.some((l) => l.exId === e.id);
+      h += '<div class="list-row"><span>' + esc(e.name) +
+        '<span style="color:var(--muted)"> · benched ' + esc(fmtDay(offMap[e.id])) + '</span></span>' +
+        '<span>' +
+        '<button class="btn-mini" onclick="restoreExercise(\'' + e.id + '\')">Restore</button>' +
+        (e.custom && !logged
+          ? ' <button class="btn-mini warn" onclick="removeCustomExercise(\'' + e.id + '\')">Remove</button>'
+          : "") +
+        "</span></div>";
+    });
+    h += "</div>";
+  }
+
+  h += renderAddExercise(s.id);
+  return h;
+}
+
+/** The words for a custom exercise's own strength-standard ratio, named to
+ *  its group's actual anchor lift so the number means something concrete
+ *  rather than an abstract multiplier. Shared between the form's initial
+ *  render (default group is "back") and updateAddExerciseVisibility(),
+ *  which re-runs it whenever the group changes, so the two can never say
+ *  different things about the same field. */
+function stdHintText(mg) {
+  /* Plain text, not HTML: used both inside a string-concatenated markup
+     block (where the call site escapes it) and assigned straight to a
+     textContent (where escaping would show literal &amp; instead of &). */
+  return "1 means this moves the same load as your " + groupLabel(mg) + " benchmark, " + MG[mg].anchor +
+    ". More than 1 if you can lift more in this than that; less than 1 if you lift less. This is your own estimate, exactly like every other ratio in this app: nothing here is checked against a published table, so treat what it does to the Strength score with the same scepticism.";
+}
+
+/** Adding a lift asks for its muscle group up front rather than defaulting
+ *  it, the same rule the shipped programme follows: nothing lands in
+ *  "core" by accident.
+ *
+ *  A free-weight custom exercise CAN feed the Strength standard, on
+ *  request: that table is built entirely from barbell and dumbbell lifts
+ *  with a ratio to their group's anchor, which is exactly what a new kg
+ *  exercise in one of the five groups is. Excluding every custom exercise
+ *  from it, the first cut of this feature did, threw away the one case
+ *  the table is actually built to handle. A cable pin or a bodyweight
+ *  movement still cannot: the pin has no reliable kilo conversion without
+ *  a calibrated stack, and a bodyweight movement has no load to convert.
+ *  When it is offered, the ratio is typed in by whoever is adding the
+ *  lift, never guessed by the app, the same honesty rule the shipped
+ *  ratios are held to. */
+
+/** Which group is most common among a session's own exercises, so the
+ *  Add-exercise form opens on a sensible guess rather than always on
+ *  whichever group happens to be listed first. Lower A is legs from top
+ *  to bottom, an unanimous answer; Upper B is a real mix, back 5, chest 3,
+ *  shoulders 3, arms 3, where the plurality is a weaker guess, right for
+ *  5 of 14 exercises rather than all of them.
+ *
+ *  A version of this that only trusted an outright majority was tried and
+ *  dropped: it fixed nothing for Upper B, since a session split roughly
+ *  three ways has no majority to fall back on either, and it actively
+ *  broke Grip, where the plurality (grip, 4 of 11) also missed a strict
+ *  50%, so it fell back to a hardcoded "back" that barely appears there
+ *  at all (1 of 11) -- a worse guess than the plurality it was replacing.
+ *  Right more often across every session beats a threshold that is right
+ *  for the unanimous cases and wrong for the mixed ones regardless of
+ *  where the cutoff sits.
+ *
+ *  Still fully editable regardless of which group wins: this only
+ *  decides what is pre-selected, never what can be chosen. */
+function defaultMgFor(sid) {
+  const counts = {};
+  PROGRAMME.filter((e) => e.s === sid).forEach((e) => { counts[e.mg] = (counts[e.mg] || 0) + 1; });
+  let best = null, bestN = 0;
+  Object.keys(counts).forEach((mg) => { if (counts[mg] > bestN) { best = mg; bestN = counts[mg]; } });
+  return best || MG_ORDER[0];
+}
+
+function renderAddExercise(sid) {
+  const groups = MG_ORDER.concat(SUPPORT_ORDER);
+  const defaultMg = defaultMgFor(sid);
+  return '<div class="panel"><div class="panel-label">Add an exercise</div>' +
+    '<div class="stack" style="margin-bottom:10px">' +
+    '<input class="field" id="neName" placeholder="Name" maxlength="60">' +
+    "</div>" +
+    '<div class="stack" style="margin-bottom:10px">' +
+    '<select class="field half" id="neUnit" onchange="updateAddExerciseVisibility()">' +
+    '<option value="kg">Weight (kg)</option>' +
+    '<option value="pin">Cable pin</option>' +
+    '<option value="bw">Bodyweight</option>' +
+    "</select>" +
+    '<select class="field half" id="neMg" onchange="updateAddExerciseVisibility()">' +
+    groups.map((g) => '<option value="' + g + '"' + (g === defaultMg ? " selected" : "") + '>' + esc(groupLabel(g)) + "</option>").join("") +
+    "</select></div>" +
+    '<div class="stack" style="margin-bottom:10px">' +
+    '<input class="field" id="neSets" type="number" inputmode="numeric" value="3" placeholder="Sets" style="max-width:64px">' +
+    '<input class="field" id="neLo" type="number" inputmode="numeric" value="6" placeholder="Low" style="max-width:64px">' +
+    '<input class="field" id="neHi" type="number" inputmode="numeric" value="8" placeholder="High" style="max-width:64px">' +
+    '<input class="field" id="neInc" type="number" step="any" inputmode="decimal" value="2.5" placeholder="Step" style="max-width:72px">' +
+    "</div>" +
+    '<div class="hint" style="margin-bottom:10px">Sets and rep range work exactly as they do for the rest of the programme. Step is the kilos (or pins) one increment adds, ignored for a bodyweight movement.</div>' +
+
+    '<div id="neDbWrap">' +
+    '<label class="check" style="margin-top:0">' +
+    '<input type="checkbox" id="neDb">' +
+    '<span>Per-dumbbell weight<span style="color:var(--muted)"> · the number you log is one dumbbell, not the pair</span></span>' +
+    "</label></div>" +
+
+    '<div id="neStdWrap">' +
+    '<label class="check">' +
+    '<input type="checkbox" id="neStdOn" onchange="updateAddExerciseVisibility()">' +
+    "<span>Count toward the Strength standard</span>" +
+    "</label>" +
+    '<div id="neStdFields" hidden style="margin-top:10px">' +
+    '<input class="field half" id="neStdR" type="number" step="any" inputmode="decimal" placeholder="1.00">' +
+    '<div class="hint" id="neStdHint" style="margin-top:8px">' + esc(stdHintText(defaultMg)) + "</div>" +
+    "</div></div>" +
+
+    '<button class="btn-secondary auto" style="margin-top:14px" onclick="addExercise(\'' + esc(sid) + '\')">Add to ' + esc(SESSIONS.find((x) => x.id === sid).name) + "</button>" +
+    "</div>";
+}
+
+/** Shows or hides the per-dumbbell and strength-standard fields as the unit
+ *  and muscle-group selects change, without a full render(): that would
+ *  wipe out a name half-typed into the field above it. Plain hidden
+ *  toggling instead, same as the rest of the runtime-capability guidance
+ *  this app otherwise has no occasion to use. */
+function updateAddExerciseVisibility() {
+  const unit = document.getElementById("neUnit").value;
+  const mg = document.getElementById("neMg").value;
+  const stdOn = document.getElementById("neStdOn");
+  const stdEligible = unit === "kg" && MG_ORDER.indexOf(mg) >= 0;
+
+  document.getElementById("neDbWrap").hidden = unit !== "kg";
+  document.getElementById("neStdWrap").hidden = !stdEligible;
+  if (!stdEligible) stdOn.checked = false;
+  document.getElementById("neStdFields").hidden = !(stdEligible && stdOn.checked);
+  if (stdEligible) document.getElementById("neStdHint").textContent = stdHintText(mg);
+}
+window.updateAddExerciseVisibility = updateAddExerciseVisibility;
+
+function benchExercise(id) {
+  const off = Object.assign({}, state.plan.off, { [id]: today() });
+  persist({ plan: Object.assign({}, state.plan, { off: off }) });
+  render();
+}
+window.benchExercise = benchExercise;
+
+function restoreExercise(id) {
+  const off = Object.assign({}, state.plan.off);
+  delete off[id];
+  persist({ plan: Object.assign({}, state.plan, { off: off }) });
+  render();
+}
+window.restoreExercise = restoreExercise;
+
+/** A custom exercise with no logged sets can be deleted outright: there is
+ *  nothing for it to orphan. One with history can only be benched, same as
+ *  a shipped lift, so a real set never becomes unreadable. */
+function removeCustomExercise(id) {
+  if (state.log.some((l) => l.exId === id)) {
+    flash("This has logged sets, so it can only be benched");
+    return;
+  }
+  if (!confirm("Remove this exercise? Nothing has ever been logged against it.")) return;
+  const custom = state.plan.custom.filter((e) => e.id !== id);
+  const off = Object.assign({}, state.plan.off);
+  delete off[id];
+  persist({ plan: Object.assign({}, state.plan, { custom: custom, off: off }) });
+  rebuildProgramme();
+  render();
+}
+window.removeCustomExercise = removeCustomExercise;
+
+function addExercise(sid) {
+  const name = (document.getElementById("neName").value || "").trim();
+  if (!name) { flash("Give it a name"); return; }
+  const unit = document.getElementById("neUnit").value;
+  const mg = document.getElementById("neMg").value;
+  const sets = Math.max(1, parseInt(document.getElementById("neSets").value, 10) || 3);
+  let lo = Math.max(0, parseInt(document.getElementById("neLo").value, 10) || 6);
+  let hi = Math.max(0, parseInt(document.getElementById("neHi").value, 10) || 8);
+  if (hi < lo) { const t = lo; lo = hi; hi = t; }
+  const inc = unit === "bw" ? 0 : (parseFloat(document.getElementById("neInc").value) || (unit === "pin" ? 1 : 2.5));
+
+  const dbOn = unit === "kg" && !!document.getElementById("neDb").checked;
+
+  /* Eligible only for a free-weight lift in one of the five scored groups,
+     same rule the shipped table follows. The ratio is never invented here:
+     it is whatever number was typed in, or the exercise does not feed the
+     standard at all, exactly the choice offered on the form. */
+  let stdSelf = null;
+  const stdEligible = unit === "kg" && MG_ORDER.indexOf(mg) >= 0;
+  if (stdEligible && document.getElementById("neStdOn").checked) {
+    const r = parseFloat(document.getElementById("neStdR").value);
+    if (!(r > 0)) {
+      flash('Give the ratio a number greater than 0, or untick "Count toward the Strength standard"');
+      return;
+    }
+    stdSelf = { r: r };
+  }
+
+  const id = "c" + Date.now().toString(36);
+  const ex = {
+    id: id, s: sid, name: name, unit: unit, sets: sets, lo: lo, hi: hi, inc: inc, mg: mg,
+    custom: true, dbSelf: dbOn, stdSelf: stdSelf,
+  };
+  persist({ plan: Object.assign({}, state.plan, { custom: state.plan.custom.concat([ex]) }) });
+  rebuildProgramme();
+  flash("Added " + name + (stdSelf ? ", counting toward Strength" : ""));
+  render();
+}
+window.addExercise = addExercise;
+
 function renderExercise() {
   const ex = BY_ID[view.exId];
   const target = state.loads[ex.id];
@@ -1339,6 +1931,10 @@ function renderExercise() {
   // The most recent session at this exact load is the one that matters for
   // double progression: you are trying to beat it.
   const lastAtLoad = sets.find((l) => l.load === target) || null;
+  /* Read off the last session at this exact load, which is the session the
+     next load is supposed to answer. Once you change the load in the box
+     below, the live version further down takes over. */
+  const sgNext = lastAtLoad ? suggestLoad(ex, lastAtLoad.reps, lastAtLoad.rir, lastAtLoad.load) : null;
 
   if (!draft) {
     const src = lastAtLoad || lastSet;
@@ -1383,6 +1979,21 @@ function renderExercise() {
           " closer to failure than when the stall began. The same work is costing more, which points at recovery, sleep or the deficit rather than at this lift. Deloading the bar would treat the wrong thing.</div>"
         : "") +
     "</div>";
+
+  /* Stand the callout down once you have taken it: the load box below
+     already says 125, and repeating the offer under a number that has
+     been accepted reads as though nothing happened. */
+  if (sgNext && parseFloat(draft.load) !== sgNext.load) {
+    h += '<div class="suggest' + (sgNext.dir < 0 ? " down" : "") + '">' +
+      '<div class="panel-label">' + (sgNext.dir < 0 ? "Suggested: come down" : "Suggested: move up") + "</div>" +
+      '<div class="suggest-row">' +
+      '<div class="suggest-val">' + esc(ex.unit === "pin" ? '"' + fmtPin(sgNext.load) + '"' : String(sgNext.load)) +
+      "<span>" + (ex.unit === "pin" ? " pin" : "kg") + "</span></div>" +
+      '<button class="btn-mini solid" onclick="useSuggested(' + sgNext.load + ')">Use it</button>' +
+      '<span class="suggest-step">' + (sgNext.dir > 0 ? "+" : "\u2212") + esc(fmtLoad(ex, sgNext.steps * (ex.inc || 1))) + "</span>" +
+      "</div>" +
+      '<div class="suggest-why">' + esc(suggestWhy(ex, sgNext)) + "</div></div>";
+  }
 
   // Load
   h += '<div class="panel"><div class="panel-label">Weight actually used</div>' +
@@ -1431,9 +2042,16 @@ function renderExercise() {
     '<button class="btn-mini" onclick="fillReps(' + ex.hi + ')">All ' + ex.hi + "</button>" +
     "</div>";
 
-  if (allTop) {
-    h += '<div style="margin-top:12px;font-size:13px;color:var(--pb);line-height:1.5">Every set at ' + ex.hi +
-      ". Next session goes to " + esc(fmtLoad(ex, roundToInc(effLoad + (ex.inc || 1), ex.inc || 1))) + ".</div>";
+  /* Live, off what is in the boxes right now, so the answer moves as you
+     tap. The callout above answers last session; this one answers this one. */
+  const sgLive = suggestLoad(ex, draft.reps, draft.rir, effLoad);
+  if (sgLive) {
+    h += '<div style="margin-top:12px;font-size:13px;line-height:1.5;color:' +
+      (sgLive.dir > 0 ? "var(--pb)" : "var(--warn)") + '">' +
+      esc(sgLive.dir > 0
+        ? "Every set at " + ex.hi + ". On these reps, next session is " + fmtLoad(ex, sgLive.load) + "."
+        : "Every set under " + ex.lo + ". On these reps, next session is " + fmtLoad(ex, sgLive.load) + ".") +
+      "</div>";
   }
   h += "</div>";
 
@@ -1466,6 +2084,95 @@ function renderExercise() {
     });
     h += "</div>";
   }
+
+  shell(h);
+}
+
+/* ==================================================================
+   PROGRAMME HEALTH, LIFT BY LIFT
+
+   The panel on Home counts lifts by status, which answers how it is
+   going and not which ones. This is the other half: the same statuses
+   expanded, worst first, every row a tap from the lift itself.
+
+   Where a lift has filled its range, the load it should move to next is
+   on the row, so the page reads as a plan for the next session rather
+   than only as a diagnosis.
+================================================================== */
+const HEALTH_ORDER = [
+  { code: "decline", label: "Declining", tone: C.bad,
+    note: "Reps went backwards twice running at the same load. Whatever is behind it, these are not going to come right on their own." },
+  { code: "fatigue", label: "Harder for the same", tone: C.warn,
+    note: "Reps have not moved, but you are finishing closer to failure than when the stall began. The same work is costing more, which points at sleep, recovery or the deficit rather than at the lift. Deloading the bar would treat the wrong thing." },
+  { code: "plateau", label: "Plateau", tone: C.bad,
+    note: "Three or more sessions with no rep gain, and reps in reserve holding steady throughout, so this reads as the lift rather than as you. A deload is the usual answer." },
+  { code: "stall", label: "Stalling", tone: C.warn,
+    note: "Two flat sessions. Too early to act on: one more tells you whether it is a plateau or fatigue." },
+  { code: "s1", label: "One flat session", tone: C.warn,
+    note: "Ordinary, and here for completeness rather than for action." },
+  { code: "ok", label: "Progressing", tone: C.pb,
+    note: "Reps went up last session, or it is the first session at a new load." },
+  { code: "new", label: "Never logged", tone: C.muted,
+    note: "No sets recorded against these, so there is nothing to judge yet." },
+];
+
+function renderHealth() {
+  const rows = PROGRAMME.map((e) => {
+    const last = state.log.filter((l) => l.exId === e.id && l.type === "set").sort((a, b) => b.ts - a.ts)[0] || null;
+    const load = state.loads[e.id];
+    /* Only suggest where the last session was run at the load the lift is
+       currently sitting on. If you have already moved it, the suggestion
+       was for a weight you are no longer using. */
+    const sg = last && load != null && last.load === load
+      ? suggestLoad(e, last.reps, last.rir, last.load) : null;
+    return { e: e, st: statusFor(e.id, state.log), last: last, load: load, sg: sg };
+  });
+
+  const moves = rows.filter((r) => r.sg).length;
+  let h = backBar("go({page:'home'})", "Programme health",
+    rows.length + " lifts \u00b7 " + moves + " with a load change waiting");
+
+  h += '<div class="panel"><div class="body-copy">Every lift in the programme, grouped by what its last few sessions did, worst first. ' +
+    "A lift counts as stalled only against itself at the same load, so moving the weight up resets the reading rather than looking like a failure. " +
+    (moves > 0
+      ? "<strong style=\"color:var(--text)\">" + moves + " lift" + (moves === 1 ? " has" : "s have") + " filled the rep range and are showing the weight to move to.</strong>"
+      : "Nothing has filled its rep range yet, so no load changes are being suggested.") +
+    "</div></div>";
+
+  HEALTH_ORDER.forEach((g) => {
+    const mine = rows.filter((r) => r.st.code === g.code)
+      .sort((a, b) => (b.last ? b.last.ts : 0) - (a.last ? a.last.ts : 0));
+    if (!mine.length) return;
+    h += '<div class="panel">' +
+      '<div class="row baseline" style="justify-content:space-between;margin-bottom:4px">' +
+      '<span class="panel-label" style="color:' + g.tone + '">' + esc(g.label) + "</span>" +
+      '<span style="font-size:15px;font-weight:600;color:' + g.tone + '">' + mine.length + "</span></div>" +
+      '<div class="hint" style="margin:0 0 6px">' + esc(g.note) + "</div>";
+
+    mine.forEach((r) => {
+      const ex = r.e;
+      const sess = SESSIONS.filter((x) => x.id === ex.s)[0];
+      const when = r.last ? (daysBetween(r.last.date, today()) === 0 ? "today" : fmtDay(r.last.date)) : "never";
+      const sub = r.last
+        ? sess.name + " \u00b7 " + when + " \u00b7 " + r.last.reps.join(", ") +
+          (r.last.rir != null ? " at " + r.last.rir + " in reserve" : "")
+        : sess.name + " \u00b7 nothing logged";
+      h += '<button class="hrow" onclick="go({page:\'exercise\',exId:\'' + ex.id + '\'})">' +
+        '<span class="hrow-name">' + esc(ex.name) + "<em>" + esc(sub) + "</em></span>" +
+        '<span class="hrow-val">' +
+        (r.sg
+          ? '<b style="color:' + (r.sg.dir > 0 ? C.pb : C.warn) + '">' +
+            esc(fmtLoad(ex, r.load) + " \u2192 " + fmtLoad(ex, r.sg.load)) + "</b>" +
+            "<span>" + (r.sg.dir > 0 ? "move up" : "come down") + "</span>"
+          : '<b style="color:var(--muted)">' + esc(r.load == null ? "\u2013\u2013" : fmtLoad(ex, r.load)) + "</b>" +
+            "<span>" + esc(r.st.streak > 0 ? r.st.streak + " flat" : "hold") + "</span>") +
+        "</span></button>";
+    });
+    h += "</div>";
+  });
+
+  h += '<div class="hint">Suggested loads come from the reps you logged at the current weight, not from a fixed rule. ' +
+    "The reasoning for each one is on that lift\u2019s own page.</div>";
 
   shell(h);
 }
@@ -1618,13 +2325,18 @@ function renderSettings() {
       return n ? ' \u00b7 ' + n + " to measure" : " \u00b7 all measured"; })() + "</button></div>" +
     "</div>";
 
-  h += '<div class="panel">' +
-    '<div class="panel-label">Backup</div>' +
-    '<div class="body-copy" style="margin-bottom:14px">Everything lives in this browser\u2019s own storage and never leaves the device: your log, working loads, peaks, bodyweight and recovery entries. Nothing is on the internet, which also means nothing is backed up and nothing syncs to your other devices. Clearing site data or switching phones loses the lot. Obsidian is the durable record for sets; this JSON file is the only thing that carries the rest, including your loads, so take one before switching device.</div>' +
-    '<div class="stack">' +
-    '<button class="btn-secondary auto" onclick="downloadBackup()">Download backup</button>' +
-    '<label class="btn-secondary auto" style="cursor:pointer">Restore from file<input type="file" accept="application/json" style="display:none" onchange="restoreBackup(this)"></label>' +
-    "</div></div>";
+  (function () {
+    const age = backupAge();
+    h += '<div class="panel">' +
+      '<div class="row baseline" style="justify-content:space-between;margin-bottom:6px">' +
+      '<div class="panel-label">Backup</div>' +
+      '<span style="font-size:13px;font-weight:600;color:' + age.tone + '">' + esc(age.text) + "</span></div>" +
+      '<div class="body-copy" style="margin-bottom:14px">Everything lives in this browser\u2019s own storage and never leaves the device: your log, working loads, peaks, bodyweight and recovery entries. Nothing is on the internet, which also means nothing is backed up and nothing syncs to your other devices. Clearing site data or switching phones loses the lot. Obsidian is the durable record for sets, and only sets: bodyweight, InBody scans, recovery days and cable calibration live only here and in this file, so it is the only thing that carries any of that across.</div>' +
+      '<div class="stack">' +
+      '<button class="btn-secondary auto" onclick="downloadBackup()">Download backup</button>' +
+      '<label class="btn-secondary auto" style="cursor:pointer">Restore from file<input type="file" accept="application/json" style="display:none" onchange="restoreBackup(this)"></label>' +
+      "</div></div>";
+  })();
 
   h += '<div class="panel">' +
     '<div class="panel-label">Add to your home screen</div>' +
@@ -1668,6 +2380,18 @@ window.bumpLoad = bumpLoad;
 function fillReps(n) { draft.reps = draft.reps.map(() => n); render(); }
 window.fillReps = fillReps;
 
+/** Take the suggestion. The reps go back to the bottom of the range with
+ *  it, because that is what a new working load means: you are buying reps
+ *  back to spend them again, not carrying last session's across. */
+function useSuggested(v) {
+  const ex = BY_ID[view.exId];
+  draft.load = String(v);
+  draft.reps = draft.reps.map(() => ex.lo);
+  flash("Set to " + fmtLoad(ex, v) + ". Reps back to " + ex.lo);
+  render();
+}
+window.useSuggested = useSuggested;
+
 function resetReps() {
   const ex = BY_ID[view.exId];
   const target = state.loads[ex.id];
@@ -1703,7 +2427,13 @@ function saveSet() {
     log: state.log.concat([entry]),
   });
 
-  flash(isPB ? "New PB. " + fmtLoad(ex, effLoad) : allTop ? "Logged. Ready to move up" : "Logged");
+  /* Name the weight rather than saying "ready to move up", so the answer
+     is already in hand when you walk back to the rack. */
+  const sg = suggestLoad(ex, entry.reps, entry.rir, effLoad);
+  flash(isPB ? "New PB. " + fmtLoad(ex, effLoad)
+    : sg && sg.dir > 0 ? "Logged. Next time " + fmtLoad(ex, sg.load)
+      : sg ? "Logged. Worth dropping to " + fmtLoad(ex, sg.load)
+        : "Logged");
   go({ page: "session", sid: ex.s });
 }
 window.saveSet = saveSet;
@@ -1819,14 +2549,36 @@ async function copyForClipboardMode() {
 window.copyForClipboardMode = copyForClipboardMode;
 
 function downloadBackup() {
+  /* Stamped into state before the blob is built, so the file records when it
+     was taken and Setup can say how long ago that was without needing to
+     trust that the click actually landed in Files. It cannot know that: a
+     browser download has no callback for success. This is the honest
+     version, "you asked for one this recently", not "one exists". */
+  persist({ settings: Object.assign({}, state.settings, { lastBackupAt: Date.now() }) });
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "gym-log-" + today() + ".json";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  render();
 }
 window.downloadBackup = downloadBackup;
+
+/** How long since the backup button was last used, in words and a tone.
+ *  Bodyweight, InBody scans, recovery days and cable calibration live
+ *  nowhere else, so this is the one nudge standing in for all of them. */
+function backupAge() {
+  const at = state.settings.lastBackupAt;
+  if (!at) return { text: "Never taken", tone: C.warn };
+  const days = Math.floor((Date.now() - at) / 864e5);
+  if (days === 0) return { text: "Today", tone: C.pb };
+  if (days === 1) return { text: "Yesterday", tone: C.pb };
+  return {
+    text: days + " days ago",
+    tone: days >= 30 ? C.bad : days >= 14 ? C.warn : C.pb,
+  };
+}
 
 function restoreBackup(input) {
   const file = input.files && input.files[0];
@@ -1843,8 +2595,14 @@ function restoreBackup(input) {
         bw: Array.isArray(d.bw) ? d.bw : state.bw,
         whoop: Array.isArray(d.whoop) ? d.whoop : state.whoop,
         inbody: Array.isArray(d.inbody) ? d.inbody : state.inbody,
+        /* Benched lifts, custom exercises and session order are as much a
+           backup as loads and peaks: a restore that dropped them would put
+           every custom exercise's history back where it can never be
+           trained again, only ever looked at. */
+        plan: d.plan ? Object.assign({ off: {}, order: {}, custom: [] }, d.plan) : state.plan,
         settings: Object.assign({}, state.settings, d.settings || {}),
       });
+      rebuildProgramme();
       flash("Restored " + d.log.length + " entries");
       go({ page: "home" });
     } catch (e) {
@@ -2125,6 +2883,51 @@ function strengthToWeight(ss, bw) {
   };
 }
 
+/* Strength per kilo of bodyweight and per kilo of lean mass, at each
+   InBody scan and nowhere else.
+
+   Two tiles that never get compared are two tiles too many, which was the
+   fair objection to having both. The comparison is the whole point: the
+   bodyweight figure falls when you gain weight whatever the weight is
+   made of, the lean figure does not, so the two pulling apart says the
+   change was fat, and the two moving together says it was not.
+
+   Only at scan dates. Lean mass between scans is not measured, and
+   carrying the last reading forward would draw a line through numbers
+   nobody ever took. Three months apart is a coarse series, but it is an
+   honest one. */
+function leanSeries() {
+  const out = [];
+  inbodySorted().forEach((sc) => {
+    if (!(sc.ffm > 0) || !sc.date) return;
+    const ss = stdScores(sc.date);
+    const total = MG_ORDER.reduce((a, g) => a + (ss[g].best || 0), 0);
+    const bw = bwOn(sc.date) || sc.weight;
+    if (!(total > 0) || !(bw > 0)) return;
+    out.push({ date: sc.date, perBw: total / bw, perLean: total / sc.ffm, total: total, ffm: sc.ffm, bw: bw });
+  });
+  return out;
+}
+
+/** The divergence between the two, in words, once there are two scans to
+ *  compare. Null until then, which is exactly the condition Rotimi set. */
+function leanDivergence() {
+  const ls = leanSeries();
+  if (ls.length < 2) return null;
+  const a = ls[0], b = ls[ls.length - 1];
+  const dBw = (b.perBw / a.perBw - 1) * 100;
+  const dLean = (b.perLean / a.perLean - 1) * 100;
+  const gap = dLean - dBw;
+  return {
+    from: a, to: b, dBw: dBw, dLean: dLean, gap: gap, n: ls.length,
+    read: Math.abs(gap) < 1.5
+      ? "The two moved together, so whatever the scale did, it was not a change in how much of you is fat."
+      : gap > 0
+        ? "Per kilo of lean mass it rose faster than per kilo of bodyweight, which means you were carrying more fat at the second scan. The lifts are outrunning the muscle less than the scale suggests."
+        : "Per kilo of bodyweight it rose faster than per kilo of lean mass, so you got leaner between the scans. Part of what looks like a strength gain is weight you no longer have to carry.",
+  };
+}
+
 /* ---- days at the gym ----------------------------------------- */
 const trainDates = () => Array.from(new Set(state.log.filter((l) => l.type === "set").map((l) => l.date))).sort();
 
@@ -2328,7 +3131,14 @@ function lineChart(series, o) {
     }
     g += '<path d="' + d + '" fill="none" stroke="' + s.c + '" stroke-width="' + (s.w || 2) +
       '" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (s.dots !== false) {
+    /* A series of a few quarterly readings wants every one marked: with
+       four months between points, the line between them is interpolation
+       and the dots are the only measured thing on the chart. */
+    if (s.dots === "all") {
+      pts.forEach((p) => {
+        g += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="3.2" fill="' + s.c + '"/>';
+      });
+    } else if (s.dots !== false) {
       const last = pts[pts.length - 1];
       g += '<circle cx="' + X(last.x).toFixed(1) + '" cy="' + Y(last.y).toFixed(1) + '" r="3.2" fill="' + s.c + '"/>';
     }
@@ -2665,6 +3475,10 @@ let trendRange = "6m";
 let trendPick = {};
 
 function setTrendMetric(k) { trendMetric = k; render(); }
+/** From a Home tile to the chart that drives it, with the metric already
+ *  chosen. The tiles say where a number stands; this is the shape behind it. */
+function goTrend(k) { trendMetric = k; go({ page: "trends" }); }
+window.goTrend = goTrend;
 window.setTrendMetric = setTrendMetric;
 function setTrendRange(k) { trendRange = k; render(); }
 window.setTrendRange = setTrendRange;
@@ -2689,7 +3503,7 @@ function trendMetrics() {
       pts: hist.map((p) => ({ x: p.date, y: p.idx - 100 })),
       fmt: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v)) + "%",
       ref: 0, refLabel: "start",
-      explain: "Every lift against the load it started on, averaged per group. Each point uses the eight weeks up to that week, so a deload shows up honestly rather than being smoothed away. No standards tables or conversions in this one, so it is the number to trust.",
+      explain: "Every lift against the load it started on, averaged per group, then the five groups averaged equally so a thirteen-lift leg day cannot outvote a five-lift shoulder day. Each point uses the eight weeks up to that week, so a deload shows up honestly rather than being smoothed away. No standards tables or conversions in this one, so it is the number to trust.",
       waiting: "Log a second week of sets and this fills in.",
     },
     strength: {
@@ -2697,7 +3511,8 @@ function trendMetrics() {
       pts: hist.filter((p) => p.std != null).map((p) => ({ x: p.date, y: p.std })),
       fmt: (v) => Math.round(v) + "/100",
       ref: 50, refLabel: "intermediate",
-      explain: "Best lift in each group, read against bodyweight standards: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average.",
+      explain: "Best lift in each group, read against bodyweight standards: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average. " +
+        "The bodyweight multiples behind those four levels are estimates written into this app rather than figures from a cited dataset, so read the shape of this line and not its exact height.",
       waiting: "Needs a bodyweight entry plus a barbell or dumbbell lift logged in two different weeks.",
     },
     bodyweight: {
@@ -2723,6 +3538,40 @@ function trendMetrics() {
         ". Answers how much work, not how heavy.",
       waiting: "Needs sets logged in two different weeks.",
     },
+    days: {
+      label: "Gym days", c: "var(--accent)", area: true, yMin: 0,
+      pts: weekBuckets(104).filter((b) => b.days > 0).map((b) => ({ x: b.week, y: b.days })),
+      fmt: (v) => v + (v === 1 ? " day" : " days"),
+      ref: SESSIONS.length, refLabel: "programme",
+      explain: "Days you logged a set, by week. The reference line is " + SESSIONS.length +
+        ", one for each session in the rotation, so a week on the line is a week that ran the programme through once.",
+      waiting: "Train in two different weeks and this fills in.",
+    },
+    lean: {
+      /* Off the chip row on purpose. It is a quarterly, two-line comparison
+         that answers one specific question, and it belongs to the Str : lean
+         tile that asks it. Sitting in the row beside Progress and Bodyweight
+         it read as a sixth thing to check on; reached by tapping the tile it
+         reads as that tile explaining itself. The chip appears only once you
+         have arrived, so the row still shows where you are. */
+      hidden: true,
+      label: "BW vs lean", c: "var(--mg-shoulders)",
+      series: (function () {
+        const ls = leanSeries();
+        if (ls.length < 2) return [];
+        const a = ls[0];
+        return [
+          { pts: ls.map((r) => ({ x: r.date, y: (r.perBw / a.perBw - 1) * 100 })), c: "var(--mg-shoulders)", w: 1.8, dots: "all" },
+          { pts: ls.map((r) => ({ x: r.date, y: (r.perLean / a.perLean - 1) * 100 })), c: "var(--mg-back)", w: 1.8, dots: "all" },
+        ];
+      })(),
+      legend: [{ c: "var(--mg-shoulders)", label: "Per kg bodyweight" }, { c: "var(--mg-back)", label: "Per kg lean mass" }],
+      fmt: (v) => (v > 0 ? "+" : v < 0 ? "\u2212" : "") + Math.abs(n1(v)) + "%",
+      ref: 0, refLabel: "first scan",
+      explain: "Both lines are the same five lifts, divided once by what you weigh and once by your fat-free mass, each indexed to your first InBody scan. " +
+        "Points sit only on scan dates, because lean mass between scans was never measured. Where the lines separate, the gap is body fat: the pair pulling apart means a weight gain was fat, and the pair tracking together means it was not.",
+      waiting: "Needs a second InBody scan. One scan gives a starting point but nothing to compare it against, which is the whole reason for having both figures.",
+    },
     sleep: {
       label: "Sleep", c: "var(--mg-shoulders)", area: true, yMax: 12,
       pts: whoopSorted().filter((r) => r.sleep != null).map((r) => ({ x: r.date, y: r.sleep })),
@@ -2741,7 +3590,7 @@ function renderTrends() {
   let out = '<div style="margin-bottom:18px"><h1 class="title">Trends</h1>' +
     '<div class="lede">How the numbers move, not just where they stand.</div></div>';
 
-  out += '<div class="chiprow">' + Object.keys(metrics).map((k) =>
+  out += '<div class="chiprow">' + Object.keys(metrics).filter((k) => !metrics[k].hidden || trendMetric === k).map((k) =>
     '<button class="chip' + (trendMetric === k ? " active" : "") + '" onclick="setTrendMetric(\'' + k + '\')">' + esc(metrics[k].label) + "</button>"
   ).join("") +
     '<button class="chip' + (trendMetric === "groups" ? " active" : "") + '" onclick="setTrendMetric(\'groups\')">By group</button></div>';
@@ -2765,6 +3614,33 @@ function renderTrends() {
       out += '<div class="body-copy">Needs at least two muscle groups with two logged weeks each in this range.</div>';
     }
     out += '<div class="hint" style="margin-top:12px">Every group’s progress line side by side, so you can see whether one is dragging behind the others rather than reading five separate charts to find out.</div></div>';
+  } else if (metrics[trendMetric].series) {
+    /* A metric that is two lines whose distance apart is the point, so it
+       cannot go down the single-series path and does not want a tapped
+       readout: with a handful of quarterly points there is nothing to hunt
+       for. It gets the divergence spelled out underneath instead. */
+    const m = metrics[trendMetric];
+    const series = m.series.map((sr) => ({
+      pts: sr.pts.filter((p) => daysBetween(p.x, today()) <= rangeDef.days), c: sr.c, w: sr.w, dots: sr.dots,
+    })).filter((sr) => sr.pts.length >= 2);
+    out += '<div class="panel">';
+    if (series.length) {
+      out += lineChart(series, { ref: m.ref, refLabel: m.refLabel, h: 220, fmt: m.fmt }) +
+        '<div class="legend">' + m.legend.map((l) =>
+          '<span><i style="background:' + l.c + '"></i>' + esc(l.label) + "</span>").join("") + "</div>";
+      const dv = leanDivergence();
+      if (dv) {
+        out += '<div class="divider"><div class="kv">' +
+          '<div><div class="k">Per kg bodyweight</div><div class="v">' + esc(m.fmt(dv.dBw)) + "</div></div>" +
+          '<div><div class="k">Per kg lean mass</div><div class="v">' + esc(m.fmt(dv.dLean)) + "</div></div>" +
+          "</div>" +
+          '<div class="body-copy" style="margin-top:12px">Across ' + dv.n + " scans, " +
+          esc(fmtDay(dv.from.date)) + " to " + esc(fmtDay(dv.to.date)) + ". " + esc(dv.read) + "</div></div>";
+      }
+    } else {
+      out += '<div class="body-copy">' + esc(m.waiting) + "</div>";
+    }
+    out += '<div class="hint" style="margin-top:12px">' + esc(m.explain) + "</div></div>";
   } else {
     const m = metrics[trendMetric];
     const pts = m.pts.filter((p) => daysBetween(p.x, today()) <= rangeDef.days);
@@ -2892,7 +3768,7 @@ function renderDash() {
   const sparkBw = sparkline(bwSorted().map((r) => ({ x: r.date, y: r.kg })), "var(--mg-legs)");
   const sparkDays = sparkline(weekBuckets(12).map((b) => ({ x: b.week, y: b.days })), "var(--accent)");
 
-  out += '<div class="tile lead wide' + (sparkProgress ? " has-spark" : "") + '">' +
+  out += '<button class="tile tap lead wide' + (sparkProgress ? " has-spark" : "") + '" onclick="goTrend(\'progress\')">' +
     (sparkProgress ? '<div class="tile-spark">' + sparkProgress + "</div>" : "") +
     '<div class="tile-label">Progress since start</div>' +
     '<div class="tile-val" style="color:var(--accent)">' +
@@ -2902,16 +3778,16 @@ function renderDash() {
       : "Every lift against the load it started on, averaged across " + oi.cov + " of 5 groups" +
         (pctPrev != null ? ". " + deltaSpan(pct, pctPrev, { fmt: (v) => n1(v) }) + " points in four weeks" : "") +
         ". No standards tables or conversions in this one, so it is the number to trust.") +
-    "</div></div>";
+    "</div></button>";
 
-  out += '<div class="tile' + (sparkRatio ? " has-spark" : "") + '">' +
+  out += '<button class="tile tap' + (sparkRatio ? " has-spark" : "") + '" onclick="goTrend(\'ratio\')">' +
     (sparkRatio ? '<div class="tile-spark">' + sparkRatio + "</div>" : "") +
     '<div class="tile-label">Str : BW</div>' +
     '<div class="tile-val">' + (s2w.ratio == null ? "--" : esc(String(n1(s2w.ratio)))) + '<span class="unit">× BW</span></div>' +
     '<div class="tile-foot">' + (s2w.ratio == null ? "Needs bodyweight."
       : Math.round(s2w.total) + "kg across five lifts" + (s2w.complete ? "" : ", " + esc(s2w.missing.join(" and ")) + " missing") +
         (prev && prev.ratio ? ". " + deltaSpan(s2w.ratio, prev.ratio, { fmt: (v) => n1(v), eps: 0.02 }) + " in four weeks" : "")) +
-    "</div></div>";
+    "</div></button>";
 
   /* Sits BESIDE the bodyweight ratio rather than replacing it, which is the
      whole point: that one moves when you bulk or cut, this one strips that
@@ -2922,7 +3798,7 @@ function renderDash() {
     const allScans = inbodySorted();
     const priorScan = allScans.length > 1 ? allScans[allScans.length - 2] : null;
     const scanAge = daysBetween(lastScan.date, t);
-    out += '<div class="tile">' +
+    out += '<button class="tile tap" onclick="goTrend(\'lean\')">' +
       '<div class="tile-label">Str : lean</div>' +
       '<div class="tile-val">' + esc(String(n1(s2w.total / leanKg))) + '<span class="unit">× lean</span></div>' +
       '<div class="tile-foot"><span class="tile-measured">' +
@@ -2931,10 +3807,10 @@ function renderDash() {
       (priorScan && priorScan.ffm > 0
         ? "Lean mass " + deltaSpan(leanKg, priorScan.ffm, { fmt: (v) => n1(v), eps: 0.1 }) + "kg since the scan before."
         : "Where this and the ratio above disagree, a weight change was fat rather than muscle.") +
-      "</div></div>";
+      "</div></button>";
   }
 
-  out += '<div class="tile' + (sparkBw ? " has-spark" : "") + '">' +
+  out += '<button class="tile tap' + (sparkBw ? " has-spark" : "") + '" onclick="goTrend(\'bodyweight\')">' +
     (sparkBw ? '<div class="tile-spark">' + sparkBw + "</div>" : "") +
     '<div class="tile-label">Weight</div>' +
     '<div class="tile-val">' + (bw ? esc(String(n1(bw.kg))) : "--") + '<span class="unit">kg</span></div>' +
@@ -2942,20 +3818,20 @@ function renderDash() {
       ? (bwDelta(28) != null
           ? deltaSpan(bwKg, bwKg - bwDelta(28), { fmt: (v) => n1(v), eps: 0.15, neutral: true }) + "kg in four weeks"
           : "First weigh-in " + esc(fmtDay(bw.date)))
-      : "Not logged") + "</div></div>";
+      : "Not logged") + "</div></button>";
 
-  out += '<div class="tile' + (sparkDays ? " has-spark" : "") + '">' +
+  out += '<button class="tile tap' + (sparkDays ? " has-spark" : "") + '" onclick="goTrend(\'days\')">' +
     (sparkDays ? '<div class="tile-spark">' + sparkDays + "</div>" : "") +
     '<div class="tile-label">Gym days</div>' +
     '<div class="tile-val">' + g.last28 + '<span class="unit"> / 28 days</span></div>' +
     '<div class="tile-foot">' + n1(g.perWeek) + " a week · " + g.total + " all time" +
     (g.gap === 0 ? " · trained today" : g.gap === 1 ? " · last one yesterday" : " · " + g.gap + " days since the last") +
-    "</div></div>";
+    "</div></button>";
 
   out += "</div>";
 
   /* ---- strength by group: the panel that should match your own read ---- */
-  out += '<div class="panel">' + panelHead("Strength by muscle group", "strength");
+  out += '<div class="panel">' + panelHead("Strength by muscle group \u00b7 estimate", "strength");
   out += '<div class="body-copy" style="margin-bottom:14px">' +
     (os.score == null
       ? "Needs a bodyweight entry and one barbell or dumbbell lift logged."
@@ -2967,11 +3843,14 @@ function renderDash() {
   out += infoBody("strength",
     "<p>Your best lift in each group, converted to what it implies for that group\u2019s benchmark movement, then read against bodyweight: 25 novice, 50 intermediate, 75 advanced, 100 elite, on " +
     esc(state.settings.sex === "female" ? "female" : "male") + " standards. Cables and isolation work are excluded: an unknown 2:1 pulley can halve the real load, and a group takes its best lift, so one loose conversion would swing the whole score.</p>" +
-    "<p><strong style=\"color:var(--text)\">Where this is weak.</strong> Comparing one group against another is the softest part. The published standards behind each benchmark are drawn from different crowds, " +
-    "squat and deadlift figures from powerlifters, curl figures from bodybuilding trainees, so advanced on one table is not quite advanced on another. " +
-    "Arms is anchored on a barbell curl, an isolation lift, while the other four are anchored on compounds, which makes it the least comparable of the five.</p>" +
-    "<p>Each conversion is a single estimate with no error bar, which is what the pale stretch on the bars shows: solid to where your own lifts still agree, pale to the figure only your best lift is claiming. " +
-    "Read a group against itself over time, and read the ordering between groups. Do not read three points between two groups as real.</p>") +
+    "<p><strong style=\"color:var(--text)\">Where the four multiples came from, plainly.</strong> They were written into this app from general familiarity with what published strength-standard tables look like. " +
+    "They were not taken from a named dataset. No sample size was checked. There is no source here for you to go and look up. They are in roughly the right area, and that is the strongest honest claim available for them.</p>" +
+    "<p>Real tables do exist and they disagree with each other. The widely used ones are built from different populations: some from competition results, some from millions of self-reported lifts inside a training app, none from a random sample of anybody. " +
+    "Even with a proper source behind each one, advanced on a squat table drawn from powerlifters is not the same claim as advanced on a curl table drawn from bodybuilding trainees. " +
+    "Arms is anchored on a barbell curl, an isolation lift, while the other four are anchored on compounds, which makes it the least comparable of the five. So the ordering between groups was always going to be softer than the digits look.</p>" +
+    "<p>Each conversion is also a single estimate with no error bar, which is what the pale stretch on the bars shows: solid to where your own lifts still agree, pale to the figure only your best lift is claiming.</p>" +
+    "<p><strong style=\"color:var(--text)\">So how should you read it?</strong> As a band, not a score. Read a group against itself over time, where the multiples cancel out and only your own lifts move. Read the ordering between groups. " +
+    "Do not read three points between two groups as a real difference, and do not read this month against last month as progress: Progress since start is the number for that, and it has no tables in it at all.</p>") +
     "</div>";
 
   const radarVals = {};
@@ -2987,6 +3866,12 @@ function renderDash() {
   });
   out += infoBody("progress",
     "<p>Each lift against the load the programme started it on, averaged per group so six leg exercises cannot outvote six arm exercises. Bars run left for a loss and right for a gain, and the scale runs to plus or minus 60 per cent.</p>" +
+    "<p><strong style=\"color:var(--text)\">Is anything weighted more heavily? No.</strong> There are two averages, one after the other, and both are flat. Every lift becomes a percentage against its own first logged set. Those percentages are averaged inside each muscle group. Then the five group figures are averaged with each other, a fifth apiece.</p>" +
+    "<p>The second step is the one worth knowing about, because this programme is not evenly sized. Legs carries " +
+    PROGRAMME.filter((e) => e.mg === "legs").length + " lifts and shoulders carries " +
+    PROGRAMME.filter((e) => e.mg === "shoulders").length +
+    ", and they still count for a fifth each. Weighting by how many lifts a group has would make the headline mostly a leg number. Weighting them equally, as here, means one group with a single fast-moving lift can pull the whole figure about as hard as a group with a dozen steady ones. Neither is neutral, and equal weighting is the one that answers is my training moving rather than how many kilos have I added in total.</p>" +
+    "<p>A group is in or out, never part way: it counts from the first set you ever log in it, and it keeps counting afterwards even if you stop, falling back to your best figure from whenever you last did it. That is why the tile names how many of the five groups it covers.</p>" +
     "<p>Cable pins and bodyweight movements count here with no calibration at all, because a ratio between two pin positions carries no units. That is why this number survives objections the strength score cannot: there are no population tables in it and no conversions between exercises.</p>" +
     "<p>It says nothing about whether a group is strong, only whether it is moving.</p>") +
     "</div>";
@@ -2994,8 +3879,8 @@ function renderDash() {
   /* ---- programme health ---- */
   const hc = healthCounts();
   const rt = rirTrend();
-  out += '<div class="panel"><div class="panel-label">Programme health</div>' +
-    '<div class="kv">' +
+  out += '<div class="panel">' + panelLink("Programme health", "go({page:\'health\'})") +
+    '<div class="kv" style="margin-top:10px">' +
     '<div><div class="k">Progressing</div><div class="v" style="color:var(--pb)">' + hc.ok + "</div></div>" +
     '<div><div class="k">Stalling</div><div class="v" style="color:var(--warn)">' + (hc.s1 + hc.stall) + "</div></div>" +
     '<div><div class="k">Plateau</div><div class="v" style="color:var(--bad)">' + hc.plateau + "</div></div>" +
@@ -3011,7 +3896,9 @@ function renderDash() {
           : rt.recent < rt.older - 0.4 ? ", so you are pushing closer to failure than you were." : ".")
       : "") +
     "</div>" +
-    '<div class="stack" style="margin-top:14px"><button class="btn-mini" onclick="go({page:\'pb\'})">PB register</button></div></div>';
+    '<div class="stack" style="margin-top:14px">' +
+    '<button class="btn-mini" onclick="go({page:\'health\'})">Which lifts</button>' +
+    '<button class="btn-mini" onclick="go({page:\'pb\'})">PB register</button></div></div>';
 
   /* ---- support work ---- */
   if (SUPPORT_ORDER.some((s) => gi[s].idx != null)) {
@@ -3097,14 +3984,15 @@ function renderBody() {
     }
 
     if (rows.length) {
-      out += '<div class="panel"><div class="panel-label">' + rows.length + " entr" + (rows.length === 1 ? "y" : "ies") + "</div>";
+      let list = "";
       rows.slice(0, 40).forEach((r) => {
-        out += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + '<span style="color:var(--muted)"> \u00b7 ' + esc(r.date.slice(0, 4)) + "</span></span>" +
+        list += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + '<span style="color:var(--muted)"> \u00b7 ' + esc(r.date.slice(0, 4)) + "</span></span>" +
           '<span>' + esc(String(n1(r.kg))) + "kg" +
           '<button class="btn-back" style="margin:0 0 0 10px;font-size:13px" onclick="delBw(\'' + esc(r.date) + '\')">Remove</button></span></div>';
       });
-      if (rows.length > 40) out += '<div class="hint">Showing the most recent 40.</div>';
-      out += "</div>";
+      if (rows.length > 40) list += '<div class="hint">Showing the most recent 40.</div>';
+      out += foldPanel("bwList", rows.length + " entr" + (rows.length === 1 ? "y" : "ies"), list,
+        "Hidden. The chart above is the part worth looking at; this is the raw list underneath it.");
     }
   }
 
@@ -3202,14 +4090,16 @@ function whoopContent() {
   }
 
   if (rows.length) {
-    out += '<div class="panel"><div class="panel-label">' + rows.length + " day(s) logged</div>";
+    let list = "";
     rows.slice(0, 30).forEach((r) => {
       const bits = WHOOP_FIELDS.filter((f) => r[f.k] != null).map((f) => n1(r[f.k]) + f.unit);
-      out += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + "</span>" +
+      list += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + "</span>" +
         '<span style="color:var(--muted);text-align:right">' + esc(bits.join(" · ") || "empty") +
         '<button class="btn-back" style="margin:0 0 0 10px;font-size:13px" onclick="delWhoop(\'' + esc(r.date) + '\')">Remove</button></span></div>';
     });
-    out += "</div>";
+    if (rows.length > 30) list += '<div class="hint">Showing the most recent 30.</div>';
+    out += foldPanel("whoopList", rows.length + " day" + (rows.length === 1 ? "" : "s") + " logged", list,
+      "Hidden. The averages and charts above are built from these; tap to see or remove individual days.");
   }
 
   return out;
@@ -3887,9 +4777,108 @@ function demoState() {
   return { loads, peaks, log, bw, whoop, inbody };
 }
 
+/* ==================================================================
+   DRAG TO REORDER
+
+   render() replaces the whole page's innerHTML on every change, so a
+   listener bound to one row would be gone by the next tap. Delegating to
+   document, and reading everything off data- attributes at the moment a
+   drag starts, means this never needs rebinding no matter how many times
+   the edit list gets redrawn underneath it.
+
+   The dragged row stays in normal flow the whole time; only its transform
+   moves. Crossing a neighbour's midpoint swaps the two in the DOM, which
+   shifts that neighbour into the gap on its own, and `shift` corrects the
+   dragged row's transform by the swapped row's height so it keeps tracking
+   the finger instead of jumping. Nothing is written to state.plan.order
+   until the finger lifts.
+------------------------------------------------------------------*/
+let dragState = null;
+
+document.addEventListener("pointerdown", (e) => {
+  const handle = e.target.closest(".drag-handle");
+  if (!handle) return;
+  const row = handle.closest(".edit-row");
+  const list = row.parentElement;
+  /* Pointer capture just keeps the drag tracking if the finger wanders off
+     the handle; move and up are bound to document regardless, so the drag
+     itself does not depend on it. It can refuse a pointer id the browser
+     does not consider active, and that must not be allowed to stop
+     dragState from being set below, or the whole gesture dies silently:
+     the row simply would not move, with nothing on screen to say why. */
+  try { row.setPointerCapture(e.pointerId); } catch (err) { /* capture is optional */ }
+  row.classList.add("dragging");
+  dragState = { row: row, list: list, startY: e.clientY, shift: 0 };
+  e.preventDefault();
+});
+
+document.addEventListener("pointermove", (e) => {
+  if (!dragState) return;
+  const d = dragState;
+  const dy = e.clientY - d.startY;
+  const applyTransform = () => { d.row.style.transform = "translateY(" + (dy + d.shift) + "px)"; };
+  applyTransform();
+
+  /* A loop, not a single check, because one pointermove can cover more
+     than one row's worth of distance: a fast flick, or the browser
+     coalescing events under load. Checking only the immediate neighbour
+     would silently drop those moves rather than reordering, since the
+     dragged row's centre can land past a neighbour's midpoint without
+     ever pausing there for a single event to catch it.
+
+     The transform has to be reapplied after every swap, not only once
+     above: getBoundingClientRect() below reads the row's actual rendered
+     position, and left stale it still reflects the shift from before this
+     swap, one row height short of where the row now truly is. Reading that
+     stale rect against a fresh DOM order is what let a single big jump run
+     away past where the finger actually was. */
+  for (;;) {
+    const rows = Array.from(d.list.querySelectorAll(".edit-row"));
+    const idx = rows.indexOf(d.row);
+    const rect = d.row.getBoundingClientRect();
+    const centerY = rect.top + rect.height / 2;
+
+    if (idx > 0) {
+      const prev = rows[idx - 1], pr = prev.getBoundingClientRect();
+      if (centerY < pr.top + pr.height / 2) {
+        d.list.insertBefore(d.row, prev);
+        d.shift += pr.height;
+        applyTransform();
+        continue;
+      }
+    }
+    if (idx < rows.length - 1) {
+      const next = rows[idx + 1], nr = next.getBoundingClientRect();
+      if (centerY > nr.top + nr.height / 2) {
+        d.list.insertBefore(next, d.row);
+        d.shift -= nr.height;
+        applyTransform();
+        continue;
+      }
+    }
+    break;
+  }
+});
+
+function endDrag() {
+  if (!dragState) return;
+  const d = dragState;
+  d.row.classList.remove("dragging");
+  d.row.style.transform = "";
+  const sid = d.list.getAttribute("data-sid");
+  const ids = Array.from(d.list.querySelectorAll(".edit-row")).map((r) => r.getAttribute("data-id"));
+  dragState = null;
+  const order = Object.assign({}, state.plan.order, { [sid]: ids });
+  persist({ plan: Object.assign({}, state.plan, { order: order }) });
+  render();
+}
+document.addEventListener("pointerup", endDrag);
+document.addEventListener("pointercancel", endDrag);
+
 /* ---- boot ---- */
 load();
 if (DEMO) { state = Object.assign({}, state, demoState(), { pendingSync: null }); }
+rebuildProgramme();
 render();
 </script>
 </body>
