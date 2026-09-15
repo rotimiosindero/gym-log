@@ -810,11 +810,11 @@ let BY_ID = Object.fromEntries(PROGRAMME.map((e) => [e.id, e]));
    leg press would only add noise.
 ------------------------------------------------------------------*/
 const MG = {
-  back:      { label: "Back",      c: "var(--mg-back)",      anchor: "Bent-over row",  std: [0.45, 0.90, 1.25, 1.60] },
-  shoulders: { label: "Shoulders", c: "var(--mg-shoulders)", anchor: "Overhead press", std: [0.35, 0.65, 0.90, 1.15] },
-  chest:     { label: "Chest",     c: "var(--mg-chest)",     anchor: "Bench press",    std: [0.50, 1.00, 1.40, 1.80] },
-  arms:      { label: "Arms",      c: "var(--mg-arms)",      anchor: "Barbell curl",   std: [0.25, 0.50, 0.70, 0.90] },
-  legs:      { label: "Legs",      c: "var(--mg-legs)",      anchor: "Back squat",     std: [0.75, 1.50, 2.10, 2.75] },
+  back:      { label: "Back",      c: "var(--mg-back)",      anchor: "Bent-over row"  },
+  shoulders: { label: "Shoulders", c: "var(--mg-shoulders)", anchor: "Overhead press" },
+  chest:     { label: "Chest",     c: "var(--mg-chest)",     anchor: "Bench press"    },
+  arms:      { label: "Arms",      c: "var(--mg-arms)",      anchor: "Barbell curl"   },
+  legs:      { label: "Legs",      c: "var(--mg-legs)",      anchor: "Back squat"     },
 };
 const MG_ORDER = ["back", "shoulders", "chest", "arms", "legs"];
 
@@ -945,13 +945,91 @@ function rebuildProgramme() {
 
 const MG_OF = (exId) => (BY_ID[exId] ? BY_ID[exId].mg : null);
 
-/* Strength standards are published for male lifters. Applied unchanged to a
-   female lifter they read 25-30 points low, so the multiples get scaled --
-   upper body harder than lower, which is what the data shows. */
-const SEX_FACTOR = {
-  male:   { back: 1, shoulders: 1, chest: 1, arms: 1, legs: 1 },
-  female: { back: 0.72, shoulders: 0.68, chest: 0.68, arms: 0.66, legs: 0.80 },
+/* ----------------------------------------------------------------
+   STRENGTH STANDARDS, TWO TIERS OF REAL DATA
+
+   Every number below is from a named, checkable source. Nothing here is
+   this app's own estimate any more, which an earlier version of this
+   comment had to admit was true of the whole table. Rotimi asked on
+   10 Sep 2026 for a proper dataset in place of that; this is what came
+   back, found and verified on 15 Sep 2026.
+
+   LEGS, CHEST, SHOULDERS -- Dr. Lon Kilgore, PhD, published via ExRx.net
+   (exrx.net/Testing/WeightLifting), squat / bench press / press. Built
+   from nearly seventy years of accumulated competitive weightlifting and
+   powerlifting classification data, not a formula and not a regression.
+   Kilgore's own page draws a real distinction worth keeping: "these
+   performance standards should not be confused with strength norms."
+   This is what competitive classification levels have required across
+   seven decades, not a random sample of the general population -- which
+   happens to fit how this app already talks about its four levels, by
+   training experience rather than by population percentile.
+
+   BACK, ARMS -- Strength Level (strengthlevel.com), bent-over row and
+   barbell curl. Neither lift is contested in any federation, so no
+   classification data of Kilgore's kind exists for them at all -- not a
+   search failure, a structural one. This is the best real substitute:
+   737,295 qualifying bent-over row results and 752,509 qualifying
+   barbell curl results, out of several million submitted, after their
+   own stated filtering for implausible entries, duplicates and unusual
+   submission patterns. Real and checkable, but one tier below the other
+   three: self-reported rather than judged in competition, and drawn
+   from one fitness app's own users rather than a federation's full
+   membership. Treat Back and Arms as the softer two of the five for
+   exactly this reason, not because the numbers were guessed.
+
+   Every table: bodyweight in kg -> [Novice, Intermediate, Advanced,
+   Elite] in kg, exactly as published. Both sources also publish a
+   "Beginner"/"Untrained" column below Novice, dropped here since the
+   app's own 0-25 band already covers it, and Kilgore's tables carry a
+   World Record column, also dropped: it answers a different question
+   than "how do I compare".
+------------------------------------------------------------------*/
+const STRENGTH_TABLES = {
+  squat: {
+    male: { 52: [65, 80, 107.5, 145], 56: [70, 87.5, 117.5, 157.5], 60: [77.5, 92.5, 127.5, 167.5], 67: [85, 105, 142.5, 185], 75: [92.5, 112.5, 155, 202.5], 82: [100, 122.5, 167.5, 217.5], 90: [105, 130, 177.5, 230], 100: [110, 135, 185, 240], 110: [115, 140, 192.5, 250], 125: [117.5, 145, 197.5, 257.5], 145: [122.5, 147.5, 202.5, 262.5] },
+    female: { 44: [37.5, 45, 60, 75], 48: [40, 47.5, 65, 80], 52: [45, 52.5, 67.5, 87.5], 56: [47.5, 55, 72.5, 90], 60: [50, 60, 77.5, 95], 67: [55, 62.5, 85, 105], 75: [57.5, 67.5, 90, 115], 82: [62.5, 75, 97.5, 122.5], 90: [67.5, 80, 105, 132.5] },
+  },
+  bench: {
+    male: { 52: [50, 60, 82.5, 100], 56: [52.5, 62.5, 90, 110], 60: [57.5, 70, 95, 117.5], 67: [65, 77.5, 107.5, 132.5], 75: [70, 85, 115, 145], 82: [75, 90, 125, 157.5], 90: [80, 97.5, 132.5, 162.5], 100: [82.5, 102.5, 137.5, 172.5], 110: [85, 105, 142.5, 180], 125: [87.5, 107.5, 147.5, 185], 145: [90, 112.5, 152.5, 190] },
+    female: { 44: [30, 35, 42.5, 52.5], 48: [32.5, 37.5, 45, 57.5], 52: [35, 37.5, 50, 62.5], 56: [37.5, 40, 52.5, 65], 60: [40, 42.5, 57.5, 67.5], 67: [40, 47.5, 62.5, 75], 75: [42.5, 52.5, 65, 85], 82: [50, 55, 72.5, 90], 90: [52.5, 60, 75, 95] },
+  },
+  press: {
+    male: { 52: [32.5, 40, 50, 60], 56: [35, 45, 52.5, 65], 60: [37.5, 47.5, 57.5, 70], 67: [42.5, 55, 62.5, 77.5], 75: [45, 57.5, 70, 85], 82: [50, 62.5, 75, 100], 90: [52.5, 65, 77.5, 105], 100: [55, 70, 82.5, 115], 110: [57.5, 72.5, 85, 120], 125: [60, 75, 87.5, 122.5], 145: [60, 75, 90, 125] },
+    female: { 44: [17.5, 22.5, 30, 40], 48: [20, 25, 32.5, 42.5], 52: [22.5, 27.5, 35, 45], 56: [22.5, 27.5, 37.5, 47.5], 60: [25, 30, 40, 50], 67: [27.5, 32.5, 42.5, 55], 75: [30, 35, 47.5, 62.5], 82: [32.5, 37.5, 50, 65], 90: [35, 40, 52.5, 67.5] },
+  },
+  row: {
+    male: { 50: [36, 52, 72, 94], 55: [41, 59, 80, 103], 60: [46, 65, 87, 111], 65: [51, 71, 94, 119], 70: [56, 77, 101, 127], 75: [61, 83, 107, 134], 80: [66, 88, 114, 141], 85: [71, 93, 120, 147], 90: [75, 99, 125, 154], 95: [79, 104, 131, 160], 100: [84, 108, 136, 166], 105: [88, 113, 142, 172], 110: [92, 118, 147, 178], 115: [96, 122, 152, 183], 120: [100, 127, 157, 188], 125: [103, 131, 161, 194], 130: [107, 135, 166, 199], 135: [111, 139, 170, 203], 140: [114, 143, 175, 208] },
+    female: { 40: [21, 33, 48, 65], 45: [23, 36, 51, 69], 50: [25, 38, 54, 72], 55: [27, 41, 57, 75], 60: [29, 43, 59, 78], 65: [30, 44, 62, 80], 70: [32, 46, 64, 83], 75: [33, 48, 66, 85], 80: [35, 50, 68, 87], 85: [36, 51, 69, 89], 90: [37, 53, 71, 91], 95: [38, 54, 73, 93], 100: [40, 56, 74, 95], 105: [41, 57, 76, 97], 110: [42, 58, 78, 99], 115: [43, 60, 79, 100], 120: [44, 61, 80, 102] },
+  },
+  curl: {
+    male: { 50: [19, 30, 43, 58], 55: [22, 33, 47, 62], 60: [24, 36, 50, 66], 65: [26, 39, 54, 70], 70: [28, 41, 57, 74], 75: [31, 44, 60, 77], 80: [33, 46, 63, 80], 85: [35, 49, 65, 84], 90: [36, 51, 68, 87], 95: [38, 53, 71, 89], 100: [40, 55, 73, 92], 105: [42, 57, 75, 95], 110: [44, 60, 78, 97], 115: [45, 61, 80, 100], 120: [47, 63, 82, 102], 125: [49, 65, 84, 105], 130: [50, 67, 86, 107], 135: [52, 69, 88, 109], 140: [53, 71, 90, 111] },
+    female: { 40: [10, 17, 27, 38], 45: [11, 19, 29, 41], 50: [12, 20, 31, 43], 55: [13, 22, 33, 45], 60: [14, 23, 34, 47], 65: [15, 24, 36, 49], 70: [16, 26, 37, 51], 75: [17, 27, 39, 52], 80: [18, 28, 40, 54], 85: [19, 29, 41, 55], 90: [20, 30, 43, 57], 95: [21, 31, 44, 58], 100: [21, 32, 45, 59], 105: [22, 33, 46, 61], 110: [23, 34, 47, 62], 115: [24, 35, 48, 63], 120: [24, 36, 49, 64] },
+  },
 };
+
+const MG_LIFT = { legs: "squat", chest: "bench", shoulders: "press", back: "row", arms: "curl" };
+
+/** The four Novice/Intermediate/Advanced/Elite thresholds for one group,
+ *  at this exact bodyweight and sex, linearly interpolated between the
+ *  two nearest rows of the real table. Below the lightest listed
+ *  bodyweight or above the heaviest, this holds the edge row flat rather
+ *  than projecting a trend past where real data stops -- a very light or
+ *  very heavy lifter's score is measured against the nearest real class,
+ *  not an invented one. */
+function strengthThresholds(mg, sex, bw) {
+  const table = STRENGTH_TABLES[MG_LIFT[mg]][sex === "female" ? "female" : "male"];
+  const points = Object.keys(table).map(Number).sort((a, b) => a - b);
+  const w = bw > 0 ? bw : points[0];
+  if (w <= points[0]) return table[points[0]];
+  if (w >= points[points.length - 1]) return table[points[points.length - 1]];
+  let lo = points[0], hi = points[points.length - 1];
+  for (let i = 0; i < points.length - 1; i++) {
+    if (w >= points[i] && w <= points[i + 1]) { lo = points[i]; hi = points[i + 1]; break; }
+  }
+  const t = (w - lo) / (hi - lo);
+  return table[lo].map((v, i) => v + (table[hi][i] - v) * t);
+}
 
 const LEVELS = [
   { at: 25, name: "Novice" }, { at: 50, name: "Intermediate" },
@@ -965,7 +1043,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.2 \u00b7 exercise rotation";
+const VERSION = "2.3 \u00b7 real strength tables";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1738,7 +1816,7 @@ function stdHintText(mg) {
      block (where the call site escapes it) and assigned straight to a
      textContent (where escaping would show literal &amp; instead of &). */
   return "1 means this moves the same load as your " + groupLabel(mg) + " benchmark, " + MG[mg].anchor +
-    ". More than 1 if you can lift more in this than that; less than 1 if you lift less. This is your own estimate, exactly like every other ratio in this app: nothing here is checked against a published table, so treat what it does to the Strength score with the same scepticism.";
+    ". More than 1 if you can lift more in this than that; less than 1 if you lift less. The benchmark itself now comes from a real published table, but this ratio is your own estimate, exactly like the other conversion ratios in this app: nobody has checked it, so treat what it does to the Strength score with the same scepticism.";
 }
 
 /** Adding a lift asks for its muscle group up front rather than defaulting
@@ -2319,7 +2397,7 @@ function renderSettings() {
     '<option value="each"' + (state.settings.dbPer !== "total" ? " selected" : "") + ">Dumbbells: weight of one (confirmed)</option>" +
     '<option value="total"' + (state.settings.dbPer === "total" ? " selected" : "") + ">Dumbbells: pair total</option>" +
     "</select></div>" +
-    '<div class="body-copy">Published strength standards are built on male lifters, so the female setting scales the bodyweight multiples down. The dumbbell setting decides whether a 30 on Overhead DB means one dumbbell or the pair, which moves that standard by a factor of two. Both are confirmed and worth leaving alone unless the programme changes. Each affects only the strength score and the strength-to-weight ratio, never the progress percentages, and neither changes a single logged number.</div>' +
+    '<div class="body-copy">Squat, bench, press, row and curl each carry a real male and a real female table now, so this setting picks the actual table rather than scaling a guess: not a factor applied to the male numbers, a different published source. The dumbbell setting decides whether a 30 on Overhead DB means one dumbbell or the pair, which moves that standard by a factor of two. Both are confirmed and worth leaving alone unless the programme changes. Each affects only the strength score and the strength-to-weight ratio, never the progress percentages, and neither changes a single logged number.</div>' +
     '<div class="stack" style="margin-top:14px"><button class="btn-secondary auto" onclick="go({page:\'pins\'})">Cable stacks' +
     (function () { const n = PROGRAMME.filter((e) => e.unit === "pin" && pinToKg(e, 1) == null).length;
       return n ? ' \u00b7 ' + n + " to measure" : " \u00b7 all measured"; })() + "</button></div>" +
@@ -2838,11 +2916,14 @@ function stdBestFor(mg, asOf, bw) {
 
 function stdScores(asOf) {
   const bw = bwOn(asOf);
-  const f = SEX_FACTOR[state.settings.sex === "female" ? "female" : "male"];
+  const sex = state.settings.sex === "female" ? "female" : "male";
   const out = {};
   MG_ORDER.forEach((mg) => {
     const b = stdBestFor(mg, asOf, bw);
-    const std = MG[mg].std.map((v) => v * f[mg]);
+    /* Real thresholds come back in kg at this exact bodyweight; dividing
+       by bw here, not inside strengthThresholds(), keeps that function
+       reusable anywhere an absolute figure is more useful than a ratio. */
+    const std = strengthThresholds(mg, sex, bw).map((v) => (bw > 0 ? v / bw : 0));
     const mult = bw > 0 ? b.best / bw : 0;
     const lowMult = bw > 0 ? b.low / bw : 0;
     const score = b.stale || !bw ? null : clamp(scoreFromMultiple(mult, std), 0, 100);
@@ -3511,8 +3592,8 @@ function trendMetrics() {
       pts: hist.filter((p) => p.std != null).map((p) => ({ x: p.date, y: p.std })),
       fmt: (v) => Math.round(v) + "/100",
       ref: 50, refLabel: "intermediate",
-      explain: "Best lift in each group, read against bodyweight standards: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average. " +
-        "The bodyweight multiples behind those four levels are estimates written into this app rather than figures from a cited dataset, so read the shape of this line and not its exact height.",
+      explain: "Best lift in each group, read against a real published table for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average. " +
+        "Legs, Chest and Shoulders are sourced from decades of competition classification data; Back and Arms from a large self-reported sample, the best real data available for two lifts no federation competes in. The ratio that converts a non-anchor lift into the group's benchmark is still this app's own estimate, so read the shape of this line more than its exact height.",
       waiting: "Needs a bodyweight entry plus a barbell or dumbbell lift logged in two different weeks.",
     },
     bodyweight: {
@@ -3831,7 +3912,7 @@ function renderDash() {
   out += "</div>";
 
   /* ---- strength by group: the panel that should match your own read ---- */
-  out += '<div class="panel">' + panelHead("Strength by muscle group \u00b7 estimate", "strength");
+  out += '<div class="panel">' + panelHead("Strength by muscle group", "strength");
   out += '<div class="body-copy" style="margin-bottom:14px">' +
     (os.score == null
       ? "Needs a bodyweight entry and one barbell or dumbbell lift logged."
@@ -3841,16 +3922,12 @@ function renderDash() {
     "</div>";
   MG_ORDER.forEach((mg) => { out += stdRow(mg, ss[mg]); });
   out += infoBody("strength",
-    "<p>Your best lift in each group, converted to what it implies for that group\u2019s benchmark movement, then read against bodyweight: 25 novice, 50 intermediate, 75 advanced, 100 elite, on " +
-    esc(state.settings.sex === "female" ? "female" : "male") + " standards. Cables and isolation work are excluded: an unknown 2:1 pulley can halve the real load, and a group takes its best lift, so one loose conversion would swing the whole score.</p>" +
-    "<p><strong style=\"color:var(--text)\">Where the four multiples came from, plainly.</strong> They were written into this app from general familiarity with what published strength-standard tables look like. " +
-    "They were not taken from a named dataset. No sample size was checked. There is no source here for you to go and look up. They are in roughly the right area, and that is the strongest honest claim available for them.</p>" +
-    "<p>Real tables do exist and they disagree with each other. The widely used ones are built from different populations: some from competition results, some from millions of self-reported lifts inside a training app, none from a random sample of anybody. " +
-    "Even with a proper source behind each one, advanced on a squat table drawn from powerlifters is not the same claim as advanced on a curl table drawn from bodybuilding trainees. " +
-    "Arms is anchored on a barbell curl, an isolation lift, while the other four are anchored on compounds, which makes it the least comparable of the five. So the ordering between groups was always going to be softer than the digits look.</p>" +
-    "<p>Each conversion is also a single estimate with no error bar, which is what the pale stretch on the bars shows: solid to where your own lifts still agree, pale to the figure only your best lift is claiming.</p>" +
-    "<p><strong style=\"color:var(--text)\">So how should you read it?</strong> As a band, not a score. Read a group against itself over time, where the multiples cancel out and only your own lifts move. Read the ordering between groups. " +
-    "Do not read three points between two groups as a real difference, and do not read this month against last month as progress: Progress since start is the number for that, and it has no tables in it at all.</p>") +
+    "<p>Your best lift in each group, converted to what it implies for that group\u2019s benchmark movement, then read against a real published table for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded from feeding a lift into this: an unknown 2:1 pulley can halve the real load, and a group takes its best lift, so one loose conversion would swing the whole score.</p>" +
+    "<p><strong style=\"color:var(--text)\">Where the tables actually came from.</strong> Legs, Chest and Shoulders are squat, bench press and overhead press, from Dr. Lon Kilgore, PhD, published via ExRx.net: nearly seventy years of accumulated competitive weightlifting and powerlifting classification data, not a formula. Back and Arms are bent-over row and barbell curl, from Strength Level: 737,295 and 752,509 real self-reported lifts after their own filtering for implausible or duplicate entries. " +
+    "Neither row nor curl is contested in any federation, so nothing like Kilgore\u2019s decades of classification data exists for them at all \u2014 not a gap in the search, a gap in the sport. Treat Back and Arms as the softer two of the five for that reason: real and checkable, but self-reported rather than judged in competition.</p>" +
+    "<p><strong style=\"color:var(--text)\">What is still this app\u2019s own estimate.</strong> None of the five tables are. What still is: the ratio that converts a lift other than the anchor itself into what it implies for the anchor \u2014 a T-bar row read as slightly more than a bent-over row, a trap bar deadlift read as slightly more than a back squat, and so on. Those ratios were written from general familiarity with how the lifts compare, not measured, and they are the reason the pale stretch on a bar can run wide: solid to where your own lifts agree, pale to the figure only your single best-converting lift is claiming.</p>" +
+    "<p><strong style=\"color:var(--text)\">So how should you read it?</strong> More than before, but still a band, not a precise score. Read a group against itself over time. Read the ordering between groups, remembering Back and Arms sit on softer ground than the other three. " +
+    "Do not read this month against last month as progress: Progress since start is the number for that, and it has no tables or ratios in it at all.</p>") +
     "</div>";
 
   const radarVals = {};
