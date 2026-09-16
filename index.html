@@ -838,7 +838,7 @@ const MG_MAP = {
   ub6: "shoulders", ub7: "chest", ub8: "chest", ub9: "back", ub10: "shoulders",
   ub11: "arms", ub12: "arms", ub13: "arms", ub14: "back",
   // Grip, neck & abs
-  g1: "core", g2: "grip", g3: "grip", g4: "grip", g5: "cuff", g6: "back",
+  g1: "core", g2: "grip", g3: "grip", g4: "grip", g5: "grip", g6: "back",
   g7: "grip", g8: "core", g9: "core", g10: "neck", g11: "neck",
 };
 
@@ -1043,7 +1043,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.3 \u00b7 real strength tables";
+const VERSION = "2.4 \u00b7 strength breakdown";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1552,6 +1552,7 @@ function activeTabKey() {
   if (p === "home") return "home";
   if (p === "sessions" || p === "session" || p === "exercise") return "log";
   if (p === "health") return "home";
+  if (p === "strengthBreakdown") return "home";
   if (p === "trends") return "trends";
   if (p === "body") return "body";
   if (p === "settings" || p === "pins") return "setup";
@@ -1600,6 +1601,7 @@ function render() {
   if (view.page === "exercise") return renderExercise();
   if (view.page === "pb") return renderPB();
   if (view.page === "health") return renderHealth();
+  if (view.page === "strengthBreakdown") return renderStrengthBreakdown();
   if (view.page === "log") return renderLog();
   if (view.page === "sync") return renderSync();
   if (view.page === "trends") return renderTrends();
@@ -2255,6 +2257,68 @@ function renderHealth() {
   shell(h);
 }
 
+/* ==================================================================
+   WHICH LIFTS FEED THE STRENGTH SCORE
+
+   stdRow on Home already names the single lift driving each group's
+   score ("via T-bar row"), but a group takes its BEST lift, and the
+   rest were invisible: logged, converted, sitting there, just never
+   shown. This lists every eligible lift per group, not only the winner,
+   which is what "which lift contributed" actually needs answering.
+================================================================== */
+function renderStrengthBreakdown() {
+  const t = today();
+  const bw = bwOn(t);
+  const ss = stdScores(t);
+
+  let h = backBar("go({page:'home'})", "Strength breakdown",
+    "Every lift that can feed each group, not just the one currently driving it");
+
+  if (!bw) {
+    h += '<div class="note" style="border-color:var(--warn-edge);background:var(--warn-tint)">' +
+      '<strong style="color:var(--warn)">No bodyweight logged.</strong> Each lift\u2019s own load and ratio still show below, but nothing can be scored against a table without it.</div>';
+  }
+
+  MG_ORDER.forEach((mg) => {
+    const r = ss[mg];
+    const eligible = PROGRAMME.filter((e) => e.mg === mg && e.std);
+    h += '<div class="panel">' +
+      '<div class="row baseline" style="justify-content:space-between;margin-bottom:2px">' +
+      '<span class="panel-label"><span class="mg-dot" style="background:' + MG[mg].c + ';margin-right:8px"></span>' +
+      esc(MG[mg].label) + " \u00b7 " + esc(MG[mg].anchor) + "</span>" +
+      '<span style="font-size:15px;font-weight:600;color:' + MG[mg].c + '">' +
+      (r.score == null ? "\u2013\u2013" : Math.round(r.score)) + "</span></div>";
+
+    if (!eligible.length) {
+      h += '<div class="hint">Nothing in this group is set up to feed the strength standard.</div></div>';
+      return;
+    }
+
+    eligible.forEach((e) => {
+      const row = r.lifts.find((l) => l.id === e.id);
+      const isWinner = !!row && r.from === e.name;
+      const miniScore = row && bw > 0 ? clamp(scoreFromMultiple(row.eq / bw, r.std), 0, 100) : null;
+      const sub = "r " + n1(e.std.r) + " \u2192 " + esc(MG[mg].anchor) +
+        (row ? " \u00b7 " + n1(row.eq) + "kg equivalent" : " \u00b7 nothing logged in the last eight weeks");
+      h += '<button class="hrow" onclick="go({page:\'exercise\',exId:\'' + e.id + '\'})">' +
+        '<span class="hrow-name">' + esc(e.name) +
+        (isWinner ? ' <span class="conf" style="color:var(--pb);border-color:var(--pb)">driving it</span>' : "") +
+        "<em>" + sub + "</em></span>" +
+        '<span class="hrow-val">' +
+        (miniScore != null
+          ? '<b style="color:' + (isWinner ? "var(--pb)" : "var(--muted)") + '">' + Math.round(miniScore) + "</b><span>alone</span>"
+          : '<b style="color:var(--muted)">\u2013\u2013</b><span>' + (row ? "no bodyweight" : "unlogged") + "</span>") +
+        "</span></button>";
+    });
+    h += "</div>";
+  });
+
+  h += '<div class="hint">A group takes whichever eligible lift currently implies the most, tagged "driving it" above; the others still count, they just are not the tightest bottleneck right now. ' +
+    "Cable and isolation work never appears here on purpose, see the strength panel\u2019s own \u201ci\u201d for why. Core, Grip, Neck and Rotator cuff feed Progress only and have no strength score to break down; Rotator cuff has no lift in this programme at all, so it shows nothing until one is added under a session\u2019s Edit exercises.</div>";
+
+  shell(h);
+}
+
 function renderPB() {
   let h = backBar("go({page:'home'})", "PB register", "New PBs are measured against peak, not current");
   SESSIONS.forEach((s) => {
@@ -2900,7 +2964,7 @@ function stdBestFor(mg, asOf, bw) {
       if (eq > liftBest) liftBest = eq;
       if (eq > best) { best = eq; from = e.name; }
     });
-    if (liftBest > 0) per.push({ name: e.name, eq: liftBest, r: e.std.r });
+    if (liftBest > 0) per.push({ id: e.id, name: e.name, eq: liftBest, r: e.std.r });
   });
   per.sort((a, b) => a.eq - b.eq);
   return {
@@ -3921,6 +3985,7 @@ function renderDash() {
         (soft > 0 ? "Treat that loosely: " + soft + " of " + os.cov + " groups rest on one lift or on lifts that disagree." : "")) +
     "</div>";
   MG_ORDER.forEach((mg) => { out += stdRow(mg, ss[mg]); });
+  out += '<div class="stack" style="margin-top:12px"><button class="btn-mini" onclick="go({page:\'strengthBreakdown\'})">Which lifts</button></div>';
   out += infoBody("strength",
     "<p>Your best lift in each group, converted to what it implies for that group\u2019s benchmark movement, then read against a real published table for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded from feeding a lift into this: an unknown 2:1 pulley can halve the real load, and a group takes its best lift, so one loose conversion would swing the whole score.</p>" +
     "<p><strong style=\"color:var(--text)\">Where the tables actually came from.</strong> Legs, Chest and Shoulders are squat, bench press and overhead press, from Dr. Lon Kilgore, PhD, published via ExRx.net: nearly seventy years of accumulated competitive weightlifting and powerlifting classification data, not a formula. Back and Arms are bent-over row and barbell curl, from Strength Level: 737,295 and 752,509 real self-reported lifts after their own filtering for implausible or duplicate entries. " +
