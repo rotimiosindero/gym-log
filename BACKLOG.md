@@ -32,11 +32,13 @@ What stops it being pleasant for someone who is not me:
    through setup before your own file can be loaded.
 3. **Start from an empty programme.** Nearly free, since `plan.off` already
    exists: a switch that flips all the shipped ids off at once. Worth knowing
-   before building it that the Strength standard runs on the `STD` conversion
-   ratios attached to the shipped lifts, so a blank start gives a working
-   Progress number and a mostly empty Strength panel unless the user types a
-   ratio per lift, which most will not. Correct behaviour, but it makes "start
-   empty" a poorer first run than "start from mine and switch things off".
+   before building it that the published tables are attached to the shipped
+   lifts, so a blank start gives a working Progress number and an empty
+   Strength panel until the user adds lifts the app has a table for. Correct
+   behaviour, but it makes "start empty" a poorer first run than "start from
+   mine and switch things off". The fix, if it matters, is the same one
+   section 6 needs: let the Add-exercise form offer a known table by name
+   instead of only a hand-typed ratio.
 4. **Home-screen nudge and an icon.** A dismissible note on iOS Safari when
    `navigator.standalone` is false, explaining that installing it is what stops
    Safari clearing the data after seven days of not visiting. Plus an
@@ -113,8 +115,38 @@ versus lean chart needs a second scan before it has anything to compare.
   1.125kg, is a guess nobody has checked, and every "+" load inherits it. Put
   the plate on a scale and correct it under Setup > Cable stacks, and every
   affected load becomes right at once.
-- **The `STD` conversion ratios are still unsourced.** The five group benchmark
-  tables now trace to real published data, but the ratios that translate a
-  non-anchor lift into what it implies for the group's benchmark lift were
-  written from general familiarity. No source appears to exist for most of
-  them. Do not describe the strength score as fully sourced.
+- **The `STD` conversion ratios.** RESOLVED 17 Sep 2026. Every lift in the
+  programme turned out to have a published table of its own, so the ratios
+  were deleted rather than improved. See section 6.
+
+---
+
+## 6. Anchor lifts, and the ratio learning that is parked behind them
+
+**Status:** decided 17 Sep 2026. Nothing to build yet, deliberately.
+
+Since every lift now scores against a table about that lift, there is no
+conversion ratio left anywhere in the programme, and so nothing for a
+personal-ratio learning mechanism to learn. It was designed in some detail
+and then not built, on purpose. It would apply only to a custom exercise
+whose owner typed a ratio, or a lift added later that no published table
+covers, and putting it back would place a second kind of number on a
+breakdown page that just became uniform, with its own provisional and
+confirmed states, for a case that does not currently exist. Revisit only if
+custom exercises with typed ratios actually start appearing.
+
+**What did survive is better.** Back squat, bench press and overhead press
+are the three Kilgore/ExRx tables, which are competition classification
+data going back decades and the best-sourced numbers in the file. None of
+them is performed in this programme, so that data currently sits unused.
+Rotimi said on 17 Sep 2026 that he intends to add all three occasionally
+for benchmarking, which would move legs, chest and shoulders off
+self-reported crowdsourced tables and onto the strongest evidence available.
+
+**There is a gap in the way of that, and it is the next thing to fix here.**
+The Add-exercise form can only offer a hand-typed ratio to the group anchor.
+It has no way to say "this IS the anchor lift, score it directly", which is
+exactly what these three need. Adding any of them today would mean typing a
+ratio of 1.00 and hoping, which works but reads as a coincidence rather than
+as the point. The form should offer the anchor table by name when the chosen
+muscle group's anchor is not already in the programme.

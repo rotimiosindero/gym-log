@@ -921,32 +921,56 @@ const MG_MAP = {
 /* ----------------------------------------------------------------
    Standards-eligible lifts.
 
-   Published strength standards are barbell and dumbbell numbers as
-   multiples of bodyweight. They mean nothing for a cable pin position,
-   and almost nothing for a machine, because a "35kg" plate stack on one
-   manufacturer's chest press is another's 50. So only these eleven lifts
-   feed the strength standard, each with a ratio to its group's anchor:
-   a lift you can handle MORE in than the anchor gets r > 1.
+   Published strength standards are barbell and dumbbell numbers. They
+   mean nothing for a cable pin position, and almost nothing for a
+   machine, because a "35kg" plate stack on one manufacturer's chest
+   press is another's 50. So only these lifts feed the strength standard.
+
+   Each of them now names a table that is about THAT LIFT, so the score
+   is a direct comparison and no conversion happens at all:
+
+     table  key into STRENGTH_TABLES, scored in the units it was logged
+
+   Every shipped lift here has one. Until 17 Sep 2026 they instead
+   carried `r`, a ratio to the group's anchor lift, and that is worth
+   remembering rather than quietly deleting: those ratios were written
+   from general familiarity and no source, so although the five anchor
+   tables were real, four of the five groups only reached one by way of
+   an invented multiplier. A real table reached by a made-up route is
+   not a real measurement. The fields below survive for the two cases
+   that still need them, a custom exercise whose owner typed a ratio and
+   any future lift no published table covers:
 
      r    ratio to the group anchor. anchor-equivalent = e1RM / r
      db   weight is per dumbbell, so it doubles (see the setting)
      bwf  fraction of bodyweight carried, for weighted dips
 ------------------------------------------------------------------*/
 const STD = {
-  ua2:  { r: 1.00 },              // Bent-over row, underhand   -> row
-  ua11: { r: 1.10 },              // T-bar row                  -> row
+  ua2:  { table: "row" },        // Bent-over row, underhand: the Back anchor itself
+  ua11: { table: "tbar" },       // T-bar row
   /* ua3, the overhand row, is left out on purpose. The programme calls it
      "(form)" and runs it 30kg below the underhand row, so it is technique
      work by design. Scoring it read as a weak back rather than a light one. */
-  ua4:  { r: 1.05, db: true },    // Overhead DB                -> overhead press
-  ub1:  { r: 0.82, db: true },    // DB incline                 -> bench
-  ua9:  { r: 0.80 },              // Preacher curl              -> barbell curl
-  ub12: { r: 2.70, bwf: 0.90 },   // Weighted dips              -> barbell curl
-  la2:  { r: 1.15 },              // Trap bar deadlift          -> back squat
-  lb3:  { r: 0.80 },              // Zercher squat              -> back squat
-  lb4:  { r: 1.05 },              // Romanian deadlift          -> back squat
-  lb5:  { r: 1.05, db: true },    // Romanian deadlift, DB      -> back squat
-
+  ua4:  { table: "pressdb" },    // Overhead DB          (table is per dumbbell)
+  ub1:  { table: "inclinedb" },  // DB incline           (table is per dumbbell)
+  ua9:  { table: "preacher" },   // Bi, preacher
+  /* Weighted dips are a triceps and chest push. They used to be converted
+     into a barbell curl, which no value of a ratio could have made right:
+     the two lifts are not measuring the same thing, so that was an error
+     of kind rather than of size, and it was driving the whole arms score.
+     The dip table is added belt weight, exactly what gets logged here, so
+     the lift now answers for itself and arms is the average of a push and
+     a pull rather than a curl with a push mistranslated into it. */
+  /* `bwf` survives on this one entry and means something different from
+     what it used to. It is no longer part of any score: it is the share
+     of bodyweight a dip actually moves, used only by the kilos-moved
+     tally behind Str : BW, so that a lift logged as "+20" is not counted
+     as twenty kilos of work. */
+  ub12: { table: "dip", bwf: 0.90 },  // Tri, weighted dips (table is ADDED weight)
+  la2:  { table: "hexbar" },     // Trap bar deadlift
+  lb3:  { table: "zercher" },    // Zercher squat
+  lb4:  { table: "rdl" },        // Romanian deadlift
+  lb5:  { table: "rdldb" },      // Romanian deadlift, DB (table is per dumbbell)
 };
 
 /* NO CABLE LIFT FEEDS THE STANDARD, deliberately, and the reason is worth
@@ -1056,6 +1080,16 @@ const MG_OF = (exId) => (BY_ID[exId] ? BY_ID[exId].mg : null);
    app's own 0-25 band already covers it, and Kilgore's tables carry a
    World Record column, also dropped: it answers a different question
    than "how do I compare".
+
+   ONE THING CHANGED UNDER THESE ON 17 SEP 2026 and the comment above is
+   now a description of the anchors rather than of what the app mostly
+   reads. Every lift in this programme gained a table of its own (see the
+   block further down), so squat, bench, press and curl are no longer
+   reached by anything here: only `row` is, because the bent-over row is
+   both the Back anchor and a lift that actually gets performed. The
+   other four stay for a lift that is added later, for a custom exercise
+   with a typed ratio, and because Kilgore's data is the best in the file
+   and becomes live again the moment one of those lifts is trained.
 ------------------------------------------------------------------*/
 const STRENGTH_TABLES = {
   squat: {
@@ -1078,7 +1112,106 @@ const STRENGTH_TABLES = {
     male: { 50: [19, 30, 43, 58], 55: [22, 33, 47, 62], 60: [24, 36, 50, 66], 65: [26, 39, 54, 70], 70: [28, 41, 57, 74], 75: [31, 44, 60, 77], 80: [33, 46, 63, 80], 85: [35, 49, 65, 84], 90: [36, 51, 68, 87], 95: [38, 53, 71, 89], 100: [40, 55, 73, 92], 105: [42, 57, 75, 95], 110: [44, 60, 78, 97], 115: [45, 61, 80, 100], 120: [47, 63, 82, 102], 125: [49, 65, 84, 105], 130: [50, 67, 86, 107], 135: [52, 69, 88, 109], 140: [53, 71, 90, 111] },
     female: { 40: [10, 17, 27, 38], 45: [11, 19, 29, 41], 50: [12, 20, 31, 43], 55: [13, 22, 33, 45], 60: [14, 23, 34, 47], 65: [15, 24, 36, 49], 70: [16, 26, 37, 51], 75: [17, 27, 39, 52], 80: [18, 28, 40, 54], 85: [19, 29, 41, 55], 90: [20, 30, 43, 57], 95: [21, 31, 44, 58], 100: [21, 32, 45, 59], 105: [22, 33, 46, 61], 110: [23, 34, 47, 62], 115: [24, 35, 48, 63], 120: [24, 36, 49, 64] },
   },
+
+  /* ---- Tables for individual lifts, not group anchors ----------------
+
+     The five above answer "how does your squat compare". These answer
+     "how does your Zercher squat compare", which is a different and,
+     for this programme, far more useful question: the anchor lifts are
+     not performed here, so reaching their tables meant multiplying by a
+     conversion ratio written from general familiarity. A lift with its
+     own table needs no ratio at all, and an unsourced multiplier beats
+     nothing but loses to a real table every time.
+
+     All Strength Level, same tier as Back and Arms above, so these are
+     the softer sort of real: self-reported, one app's users, and each
+     lift's own self-selected crowd. Sample size varies by more than an
+     order of magnitude across them, which is why each carries its
+     qualifying-result count: Zercher squat rests on 34,306 and incline
+     dumbbell press on 647,300, and the app says so rather than
+     presenting them as equally solid.
+
+     UNITS MATTER HERE AND ARE NOT UNIFORM. Barbell figures include the
+     bar at 20kg and the hex bar at 30kg, matching how loads are logged
+     in this app (confirmed with Rotimi 17 Sep 2026). Dumbbell figures
+     are for ONE dumbbell, which is what `settings.dbPer` already
+     describes, so these must NOT be doubled the way a barbell-equivalent
+     conversion had to be. And the dip table is ADDED belt weight, going
+     negative at light bodyweights where the assisted machine takes over,
+     so it is not a load and must not be treated as one.
+  -------------------------------------------------------------------- */
+  /* Trap/hex bar deadlift. 335,172 qualifying results (288,570 male, 46,602 female) from 1,437,859 community lifts, to 8 March 2026. */
+  hexbar: {
+    male: { 50: [81, 110, 144, 181], 55: [90, 120, 156, 194], 60: [98, 130, 167, 206], 65: [107, 140, 178, 218], 70: [115, 149, 188, 230], 75: [122, 158, 198, 241], 80: [130, 166, 207, 251], 85: [137, 174, 216, 261], 90: [144, 182, 225, 270], 95: [150, 190, 233, 280], 100: [157, 197, 242, 288], 105: [163, 204, 249, 297], 110: [169, 211, 257, 305], 115: [175, 218, 264, 313], 120: [181, 224, 271, 321], 125: [187, 230, 278, 328], 130: [192, 236, 285, 336], 135: [198, 242, 292, 343], 140: [203, 248, 298, 350] },
+    female: { 40: [51, 73, 99, 127], 45: [56, 79, 105, 134], 50: [60, 84, 111, 140], 55: [64, 88, 116, 146], 60: [68, 93, 121, 152], 65: [71, 97, 126, 157], 70: [75, 101, 130, 162], 75: [78, 104, 135, 167], 80: [81, 108, 139, 171], 85: [84, 111, 142, 176], 90: [87, 115, 146, 180], 95: [90, 118, 150, 184], 100: [92, 121, 153, 187], 105: [95, 123, 156, 191], 110: [97, 126, 159, 194], 115: [99, 129, 162, 198], 120: [102, 131, 165, 201] },
+  },
+  /* Incline dumbbell press. 647,300 qualifying results (611,670 male, 35,630 female) from 2,367,587 community lifts, to 5 March 2026. */
+  inclinedb: {
+    male: { 50: [16, 24, 32, 42], 55: [19, 26, 36, 46], 60: [21, 29, 39, 49], 65: [23, 32, 42, 53], 70: [25, 34, 45, 56], 75: [27, 37, 48, 59], 80: [29, 39, 50, 62], 85: [32, 42, 53, 65], 90: [33, 44, 55, 68], 95: [35, 46, 58, 71], 100: [37, 48, 60, 73], 105: [39, 50, 63, 76], 110: [41, 52, 65, 78], 115: [42, 54, 67, 81], 120: [44, 56, 69, 83], 125: [46, 58, 71, 85], 130: [47, 60, 73, 87], 135: [49, 61, 75, 89], 140: [51, 63, 77, 91] },
+    female: { 40: [8, 13, 20, 27], 45: [9, 15, 21, 29], 50: [10, 16, 23, 31], 55: [11, 17, 25, 33], 60: [12, 19, 26, 35], 65: [13, 20, 28, 36], 70: [14, 21, 29, 38], 75: [15, 22, 30, 39], 80: [16, 23, 31, 41], 85: [17, 24, 33, 42], 90: [18, 25, 34, 43], 95: [18, 26, 35, 44], 100: [19, 27, 36, 46], 105: [20, 28, 37, 47], 110: [20, 28, 38, 48], 115: [21, 29, 39, 49], 120: [22, 30, 40, 50] },
+  },
+  /* Dumbbell shoulder press. 621,197 qualifying results (540,746 male, 80,451 female) from 2,106,645 community lifts, to 5 March 2026. */
+  pressdb: {
+    male: { 50: [12, 19, 27, 36], 55: [14, 21, 30, 40], 60: [15, 23, 32, 43], 65: [17, 25, 35, 46], 70: [19, 27, 37, 48], 75: [21, 29, 40, 51], 80: [22, 31, 42, 54], 85: [24, 33, 44, 56], 90: [25, 35, 46, 59], 95: [27, 37, 48, 61], 100: [28, 39, 50, 63], 105: [30, 40, 52, 65], 110: [31, 42, 54, 67], 115: [33, 44, 56, 69], 120: [34, 45, 58, 71], 125: [35, 47, 59, 73], 130: [37, 48, 61, 75], 135: [38, 50, 63, 77], 140: [39, 51, 64, 79] },
+    female: { 40: [7, 11, 16, 22], 45: [8, 12, 17, 23], 50: [8, 13, 18, 25], 55: [9, 14, 19, 26], 60: [10, 15, 20, 27], 65: [10, 15, 21, 28], 70: [11, 16, 22, 29], 75: [12, 17, 23, 30], 80: [12, 17, 24, 31], 85: [13, 18, 25, 32], 90: [13, 19, 25, 32], 95: [14, 19, 26, 33], 100: [14, 20, 27, 34], 105: [15, 20, 27, 35], 110: [15, 21, 28, 35], 115: [15, 21, 28, 36], 120: [16, 22, 29, 37] },
+  },
+  /* T-bar row. 85,898 qualifying results (79,547 male, 6,351 female) from 368,631 community lifts, to 7 March 2026. */
+  tbar: {
+    male: { 50: [30, 48, 71, 97], 55: [35, 54, 78, 105], 60: [39, 60, 85, 114], 65: [44, 66, 92, 122], 70: [49, 72, 99, 129], 75: [53, 77, 105, 136], 80: [58, 82, 111, 143], 85: [62, 87, 117, 150], 90: [66, 92, 123, 156], 95: [70, 97, 129, 163], 100: [74, 102, 134, 169], 105: [78, 106, 139, 175], 110: [82, 111, 144, 180], 115: [85, 115, 149, 186], 120: [89, 119, 154, 191], 125: [92, 123, 158, 196], 130: [96, 127, 163, 201], 135: [99, 131, 167, 206], 140: [103, 135, 172, 211] },
+    female: { 40: [19, 32, 49, 69], 45: [21, 35, 53, 73], 50: [23, 37, 56, 77], 55: [25, 40, 59, 80], 60: [26, 42, 62, 84], 65: [28, 44, 64, 87], 70: [30, 46, 67, 89], 75: [31, 48, 69, 92], 80: [33, 50, 71, 95], 85: [34, 52, 73, 97], 90: [35, 53, 75, 99], 95: [37, 55, 77, 101], 100: [38, 57, 79, 104], 105: [39, 58, 81, 106], 110: [40, 59, 82, 107], 115: [42, 61, 84, 109], 120: [43, 62, 85, 111] },
+  },
+  /* Preacher curl. 102,499 qualifying results (97,143 male, 5,356 female) from 438,838 community lifts, to 5 March 2026. */
+  preacher: {
+    male: { 50: [19, 30, 43, 58], 55: [21, 33, 47, 62], 60: [23, 35, 50, 66], 65: [25, 38, 53, 69], 70: [27, 40, 56, 72], 75: [29, 42, 58, 76], 80: [31, 45, 61, 78], 85: [33, 47, 63, 81], 90: [35, 49, 66, 84], 95: [36, 51, 68, 87], 100: [38, 53, 70, 89], 105: [39, 55, 72, 91], 110: [41, 56, 74, 94], 115: [42, 58, 76, 96], 120: [44, 60, 78, 98], 125: [45, 62, 80, 100], 130: [47, 63, 82, 102], 135: [48, 65, 84, 104], 140: [49, 66, 86, 106] },
+    female: { 40: [9, 17, 26, 36], 45: [11, 18, 28, 39], 50: [12, 20, 30, 41], 55: [14, 22, 32, 44], 60: [15, 23, 34, 46], 65: [16, 25, 36, 48], 70: [17, 26, 37, 50], 75: [18, 28, 39, 52], 80: [19, 29, 41, 54], 85: [20, 30, 42, 55], 90: [21, 32, 44, 57], 95: [22, 33, 45, 59], 100: [23, 34, 46, 60], 105: [24, 35, 48, 62], 110: [25, 36, 49, 63], 115: [26, 37, 50, 64], 120: [27, 38, 51, 66] },
+  },
+  /* Weighted dip, ADDED weight. 517,475 qualifying results (489,613 male, 27,862 female) from 2,162,628 community lifts, to 5 March 2026. */
+  dip: {
+    male: { 50: [11, 31, 54, 78], 55: [14, 35, 59, 85], 60: [17, 39, 64, 91], 65: [20, 43, 69, 96], 70: [22, 46, 73, 101], 75: [25, 49, 77, 106], 80: [26, 52, 81, 111], 85: [28, 55, 84, 114], 90: [30, 57, 87, 118], 95: [31, 59, 90, 122], 100: [32, 61, 92, 125], 105: [33, 62, 94, 127], 110: [34, 64, 96, 130], 115: [35, 65, 98, 132], 120: [35, 66, 100, 135], 125: [36, 67, 101, 136], 130: [36, 68, 103, 138], 135: [36, 69, 104, 140], 140: [37, 69, 105, 141] },
+    female: { 40: [-4, 10, 26, 44], 45: [-3, 12, 29, 48], 50: [-2, 14, 32, 52], 55: [-1, 16, 35, 55], 60: [0, 17, 37, 58], 65: [0, 18, 39, 60], 70: [0, 19, 40, 62], 75: [0, 20, 41, 64], 80: [0, 20, 42, 66], 85: [0, 20, 43, 67], 90: [-1, 20, 43, 68], 95: [-2, 20, 44, 69], 100: [-2, 20, 44, 69], 105: [-3, 19, 44, 70], 110: [-4, 19, 44, 70], 115: [-5, 18, 43, 70], 120: [-7, 17, 43, 70] },
+  },
+  /* Romanian deadlift. 359,740 qualifying results (264,363 male, 95,377 female) from 1,151,417 community lifts, to 5 March 2026. */
+  rdl: {
+    male: { 50: [51, 76, 106, 140], 55: [58, 85, 117, 152], 60: [65, 93, 127, 163], 65: [72, 102, 136, 174], 70: [79, 110, 145, 184], 75: [85, 117, 154, 194], 80: [92, 125, 163, 203], 85: [98, 132, 171, 213], 90: [104, 139, 179, 221], 95: [110, 145, 186, 230], 100: [115, 152, 194, 238], 105: [121, 158, 201, 246], 110: [126, 164, 208, 254], 115: [132, 170, 214, 261], 120: [137, 176, 221, 268], 125: [142, 182, 227, 275], 130: [147, 188, 233, 282], 135: [151, 193, 240, 289], 140: [156, 198, 245, 295] },
+    female: { 40: [37, 55, 77, 101], 45: [40, 58, 81, 105], 50: [42, 61, 84, 109], 55: [44, 64, 87, 113], 60: [47, 67, 90, 116], 65: [49, 69, 93, 119], 70: [51, 71, 96, 122], 75: [52, 73, 98, 125], 80: [54, 75, 100, 128], 85: [56, 77, 103, 130], 90: [57, 79, 105, 132], 95: [59, 81, 107, 135], 100: [60, 83, 109, 137], 105: [62, 84, 111, 139], 110: [63, 86, 112, 141], 115: [64, 87, 114, 143], 120: [65, 89, 116, 145] },
+  },
+  /* Romanian deadlift, dumbbell. 48,206 qualifying results (31,962 male, 16,244 female) from 287,451 community lifts, to 5 March 2026. */
+  rdldb: {
+    male: { 50: [17, 27, 41, 56], 55: [19, 30, 45, 61], 60: [21, 33, 48, 65], 65: [23, 36, 51, 69], 70: [26, 39, 55, 72], 75: [28, 41, 58, 76], 80: [30, 44, 61, 79], 85: [32, 46, 63, 82], 90: [34, 48, 66, 85], 95: [35, 51, 69, 88], 100: [37, 53, 71, 91], 105: [39, 55, 74, 94], 110: [41, 57, 76, 97], 115: [42, 59, 78, 99], 120: [44, 61, 81, 102], 125: [46, 63, 83, 104], 130: [47, 65, 85, 107], 135: [49, 67, 87, 109], 140: [50, 68, 89, 111] },
+    female: { 40: [14, 23, 33, 46], 45: [15, 24, 35, 47], 50: [16, 25, 36, 49], 55: [17, 26, 37, 50], 60: [17, 27, 39, 52], 65: [18, 28, 40, 53], 70: [19, 29, 41, 54], 75: [20, 30, 42, 55], 80: [20, 30, 43, 56], 85: [21, 31, 44, 57], 90: [21, 32, 44, 58], 95: [22, 33, 45, 59], 100: [22, 33, 46, 60], 105: [23, 34, 47, 61], 110: [23, 34, 47, 62], 115: [24, 35, 48, 63], 120: [24, 36, 49, 63] },
+  },
+  /* Zercher squat. 34,306 qualifying results (31,498 male, 2,808 female) from 237,119 community lifts, to 5 March 2026. */
+  zercher: {
+    male: { 50: [45, 69, 98, 131], 55: [52, 77, 108, 141], 60: [58, 85, 117, 152], 65: [64, 92, 125, 161], 70: [70, 99, 133, 171], 75: [76, 106, 141, 180], 80: [82, 113, 149, 188], 85: [87, 119, 156, 196], 90: [92, 125, 163, 204], 95: [97, 131, 170, 212], 100: [102, 137, 177, 219], 105: [107, 143, 183, 226], 110: [112, 148, 189, 233], 115: [117, 153, 195, 240], 120: [121, 158, 201, 246], 125: [125, 163, 207, 252], 130: [130, 168, 212, 258], 135: [134, 173, 217, 264], 140: [138, 178, 223, 270] },
+    female: { 40: [28, 44, 63, 85], 45: [31, 48, 68, 91], 50: [34, 52, 73, 96], 55: [37, 55, 77, 101], 60: [40, 59, 81, 106], 65: [42, 62, 85, 110], 70: [45, 65, 88, 114], 75: [47, 68, 92, 118], 80: [50, 71, 95, 122], 85: [52, 73, 98, 125], 90: [54, 76, 101, 128], 95: [56, 78, 104, 132], 100: [58, 81, 107, 135], 105: [60, 83, 109, 138], 110: [62, 85, 112, 140], 115: [64, 87, 114, 143], 120: [66, 89, 116, 146] },
+  },
 };
+
+/* What each table is about, and how much sits behind it. The counts are
+   qualifying results, not raw submissions: the community totals are three
+   to five times larger and quoting those would flatter every one of these.
+   The spread is wide enough to matter, so a table below THIN_TABLE says so
+   on screen rather than sitting silently beside one with twenty times the
+   evidence. */
+const THIN_TABLE = 120000;
+const TABLE_META = {
+  squat:     { label: "back squat",         n: null },   // Kilgore/ExRx, not a sample count
+  bench:     { label: "bench press",        n: null },
+  press:     { label: "overhead press",     n: null },
+  row:       { label: "bent-over row",      n: 737295 },
+  curl:      { label: "barbell curl",       n: 752509 },
+  hexbar:    { label: "hex bar deadlift",   n: 335172 },
+  inclinedb: { label: "incline DB press",   n: 647300 },
+  pressdb:   { label: "DB shoulder press",  n: 621197 },
+  tbar:      { label: "T-bar row",          n: 85898 },
+  preacher:  { label: "preacher curl",      n: 102499 },
+  dip:       { label: "weighted dip",       n: 517475 },
+  rdl:       { label: "Romanian deadlift",  n: 359740 },
+  rdldb:     { label: "DB Romanian deadlift", n: 48206 },
+  zercher:   { label: "Zercher squat",      n: 34306 },
+};
+const TABLE_LABEL = Object.fromEntries(Object.keys(TABLE_META).map((k) => [k, TABLE_META[k].label]));
+const thinTable = (k) => !!(TABLE_META[k] && TABLE_META[k].n != null && TABLE_META[k].n < THIN_TABLE);
 
 const MG_LIFT = { legs: "squat", chest: "bench", shoulders: "press", back: "row", arms: "curl" };
 
@@ -1089,8 +1222,10 @@ const MG_LIFT = { legs: "squat", chest: "bench", shoulders: "press", back: "row"
  *  than projecting a trend past where real data stops -- a very light or
  *  very heavy lifter's score is measured against the nearest real class,
  *  not an invented one. */
-function strengthThresholds(mg, sex, bw) {
-  const table = STRENGTH_TABLES[MG_LIFT[mg]][sex === "female" ? "female" : "male"];
+function tableThresholds(key, sex, bw) {
+  const group = STRENGTH_TABLES[key];
+  if (!group) return null;
+  const table = group[sex === "female" ? "female" : "male"];
   const points = Object.keys(table).map(Number).sort((a, b) => a - b);
   const w = bw > 0 ? bw : points[0];
   if (w <= points[0]) return table[points[0]];
@@ -1101,6 +1236,12 @@ function strengthThresholds(mg, sex, bw) {
   }
   const t = (w - lo) / (hi - lo);
   return table[lo].map((v, i) => v + (table[hi][i] - v) * t);
+}
+
+/** The same thing for a muscle group, via its anchor lift. Kept as its own
+ *  name because most callers think in groups, not in table keys. */
+function strengthThresholds(mg, sex, bw) {
+  return tableThresholds(MG_LIFT[mg], sex, bw);
 }
 
 const LEVELS = [
@@ -1115,7 +1256,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.5 \u00b7 light mode";
+const VERSION = "2.6 \u00b7 own tables";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -2348,7 +2489,7 @@ function renderStrengthBreakdown() {
 
   if (!bw) {
     h += '<div class="note" style="border-color:var(--warn-edge);background:var(--warn-tint)">' +
-      '<strong style="color:var(--warn)">No bodyweight logged.</strong> Each lift\u2019s own load and ratio still show below, but nothing can be scored against a table without it.</div>';
+      '<strong style="color:var(--warn)">No bodyweight logged.</strong> Each lift\u2019s own best still shows below, but every table is indexed by bodyweight, so nothing can be scored without it.</div>';
   }
 
   MG_ORDER.forEach((mg) => {
@@ -2357,7 +2498,11 @@ function renderStrengthBreakdown() {
     h += '<div class="panel">' +
       '<div class="row baseline" style="justify-content:space-between;margin-bottom:2px">' +
       '<span class="panel-label"><span class="mg-dot" style="background:' + MG[mg].c + ';margin-right:8px"></span>' +
-      esc(MG[mg].label) + " \u00b7 " + esc(MG[mg].anchor) + "</span>" +
+      esc(MG[mg].label) + " \u00b7 " + esc(
+        r.basis === "anchor" ? MG[mg].anchor + ", performed"
+        : r.basis === "median" ? "median of " + r.lifts.length
+        : r.basis === "single" ? "one lift only"
+        : "nothing scored") + "</span>" +
       '<span style="font-size:15px;font-weight:600;color:' + MG[mg].c + '">' +
       (r.score == null ? "\u2013\u2013" : Math.round(r.score)) + "</span></div>";
 
@@ -2367,25 +2512,31 @@ function renderStrengthBreakdown() {
     }
 
     eligible.forEach((e) => {
-      const row = r.lifts.find((l) => l.id === e.id);
-      const isWinner = !!row && r.from === e.name;
-      const miniScore = row && bw > 0 ? clamp(scoreFromMultiple(row.eq / bw, r.std), 0, 100) : null;
-      const sub = "r " + n1(e.std.r) + " \u2192 " + esc(MG[mg].anchor) +
-        (row ? " \u00b7 " + n1(row.eq) + "kg equivalent" : " \u00b7 nothing logged in the last eight weeks");
+      const row = r.all.filter((l) => l.id === e.id)[0];
+      const isAnchor = !!row && row.anchor;
+      /* Where each lift's number comes from, in one line, because "45"
+         means nothing without knowing it was read off the dip table in
+         added kilos rather than converted into something else. */
+      const sub = (e.std.table
+          ? "own table \u00b7 " + esc(TABLE_LABEL[e.std.table] || e.std.table) +
+            (thinTable(e.std.table) ? " (thin sample)" : "")
+          : "r " + n1(e.std.r) + " \u2192 " + esc(MG[mg].anchor)) +
+        (row ? " \u00b7 " + n1(row.value) + "kg" + (e.std.table === "dip" ? " added" : "")
+             : " \u00b7 nothing logged in the last eight weeks");
       h += '<button class="hrow" onclick="go({page:\'exercise\',exId:\'' + e.id + '\'})">' +
         '<span class="hrow-name">' + esc(e.name) +
-        (isWinner ? ' <span class="conf" style="color:var(--pb);border-color:var(--pb)">driving it</span>' : "") +
+        (isAnchor ? ' <span class="conf" style="color:var(--pb);border-color:var(--pb)">the benchmark</span>' : "") +
         "<em>" + sub + "</em></span>" +
         '<span class="hrow-val">' +
-        (miniScore != null
-          ? '<b style="color:' + (isWinner ? "var(--pb)" : "var(--muted)") + '">' + Math.round(miniScore) + "</b><span>alone</span>"
+        (row && row.score != null
+          ? '<b style="color:' + (isAnchor ? "var(--pb)" : "var(--muted)") + '">' + Math.round(row.score) + "</b><span>alone</span>"
           : '<b style="color:var(--muted)">\u2013\u2013</b><span>' + (row ? "no bodyweight" : "unlogged") + "</span>") +
         "</span></button>";
     });
     h += "</div>";
   });
 
-  h += '<div class="hint">A group takes whichever eligible lift currently implies the most, tagged "driving it" above; the others still count, they just are not the tightest bottleneck right now. ' +
+  h += '<div class="hint">Each lift is scored against a table about that lift, so nothing above is converted into anything else and the numbers can be compared to each other. A group takes the median of them, not the best, because taking the best let whichever lift flattered you most decide. Where the actual benchmark lift is performed it wins outright, tagged "the benchmark" above, since nothing is being inferred. ' +
     "Cable and isolation work never appears here on purpose, see the strength panel\u2019s own \u201ci\u201d for why. Core, Grip, Neck and Rotator cuff feed Progress only and have no strength score to break down; Rotator cuff has no lift in this programme at all, so it shows nothing until one is added under a session\u2019s Edit exercises.</div>";
 
   shell(h);
@@ -2547,7 +2698,7 @@ function renderSettings() {
     '<option value="each"' + (state.settings.dbPer !== "total" ? " selected" : "") + ">Dumbbells: weight of one (confirmed)</option>" +
     '<option value="total"' + (state.settings.dbPer === "total" ? " selected" : "") + ">Dumbbells: pair total</option>" +
     "</select></div>" +
-    '<div class="body-copy">Squat, bench, press, row and curl each carry a real male and a real female table now, so this setting picks the actual table rather than scaling a guess: not a factor applied to the male numbers, a different published source. The dumbbell setting decides whether a 30 on Overhead DB means one dumbbell or the pair, which moves that standard by a factor of two. Both are confirmed and worth leaving alone unless the programme changes. Each affects only the strength score and the strength-to-weight ratio, never the progress percentages, and neither changes a single logged number.</div>' +
+    '<div class="body-copy">Every lift that feeds the strength score has its own published table, with a real male and a real female version, so this setting picks the actual table rather than scaling a guess: not a factor applied to the male numbers, a different published source. Worth knowing that the female tables are built on far fewer results than the male ones, often by a factor of ten. The dumbbell setting decides whether a 30 on Overhead DB means one dumbbell or the pair. That matters because the dumbbell tables are published per dumbbell, so getting it backwards is a clean factor of two. Both are confirmed and worth leaving alone unless the programme changes. Each affects only the strength score and the strength-to-weight ratio, never the progress percentages, and neither changes a single logged number.</div>' +
     '<div class="stack" style="margin-top:14px"><button class="btn-secondary auto" onclick="go({page:\'pins\'})">Cable stacks' +
     (function () { const n = PROGRAMME.filter((e) => e.unit === "pin" && pinToKg(e, 1) == null).length;
       return n ? ' \u00b7 ' + n + " to measure" : " \u00b7 all measured"; })() + "</button></div>" +
@@ -3057,45 +3208,115 @@ function levelName(s) {
 
 /** Best anchor-equivalent one-rep max for a group: what a bent-over row,
  *  overhead press, bench, curl or squat this result implies. */
+function median(xs) {
+  const s = xs.slice().sort((a, b) => a - b), n = s.length;
+  if (!n) return null;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+/**
+ * Every lift in one group, each scored against whichever real table is
+ * actually about it, then combined.
+ *
+ * This used to convert every lift into anchor-equivalent kilos with a
+ * ratio, take the highest, and score that once. Two things were wrong
+ * with it. The ratios were written from general familiarity and nothing
+ * else, so four of the five groups reached a real table only through an
+ * invented number. And taking the highest meant the loosest ratio always
+ * won, which is a bias, not noise: on demo data it read the two arm
+ * lifts as disagreeing by eleven points when putting each on its own
+ * table showed them agreeing to within one.
+ *
+ * So a lift with its own published table is scored in the units it was
+ * logged in and no ratio is involved. A lift without one still converts
+ * to the group anchor, which is now the exception rather than the rule.
+ * Both paths end in a 0-100 score, which is what makes them combinable:
+ * hex bar kilos and squat-equivalent kilos are not the same unit and
+ * never were comparable, whatever the old code did with them.
+ */
 function stdBestFor(mg, asOf, bw) {
-  let best = 0, from = null;
+  const sex = state.settings.sex === "female" ? "female" : "male";
+  const anchorKey = MG_LIFT[mg];
   const per = [];
+
   PROGRAMME.filter((e) => e.mg === mg && e.std).forEach((e) => {
-    let liftBest = 0;
+    const own = !!e.std.table;
+    let best = 0, physBest = 0;
     state.log.forEach((l) => {
       if (l.type !== "set" || l.exId !== e.id || l.date > asOf) return;
       if (daysBetween(l.date, asOf) > WINDOW_DAYS) return;
       if (!l.reps || !l.reps.length) return;
       const reps = Math.min(Math.max.apply(null, l.reps), REP_CAP);
       if (reps <= 0) return;
+
       let load;
       if (e.unit === "pin") {
-        /* No cable lift carries a `std` entry today (see the note under STD),
-           so nothing reaches this branch. It stays because the calibration is
-           already in place if one is ever judged reliable enough to count. */
+        /* No cable lift carries a `std` entry today (see the note under
+           STD), so nothing reaches this branch. It stays because the
+           calibration is already in place if one is ever judged reliable
+           enough to count. */
         const k = pinToKg(e, l.load);
         if (k == null) return;
         load = k;
       } else {
-        load = l.load * (e.db && state.settings.dbPer !== "total" ? 2 : 1);
+        load = l.load;
       }
-      if (e.std.bwf) load += e.std.bwf * bw;
-      const eq = (load * (1 + reps / 30)) / e.std.r;
-      if (eq > liftBest) liftBest = eq;
-      if (eq > best) { best = eq; from = e.name; }
+
+      /* A lift with its own table is compared in the units it was logged
+         in, because those are the units the table publishes: one dumbbell
+         for the dumbbell tables, added belt weight for the dip table, bar
+         included for the barbell ones. Doubling a pair and adding a slice
+         of bodyweight belong only to the ratio path, which has to reach a
+         barbell equivalent to mean anything. */
+      let phys = load;
+      if (e.db && state.settings.dbPer !== "total") phys *= 2;   // two dumbbells get moved
+      if (e.std.bwf) phys += e.std.bwf * bw;                     // and a dip moves you
+      /* The ratio path is trying to reach a barbell equivalent, so it starts
+         from the physical load. A lift with its own table does not: it is
+         compared in the units the table publishes, which is the units it
+         was logged in. */
+      if (!own) load = phys;
+      const v = own ? load * (1 + reps / 30) : (load * (1 + reps / 30)) / e.std.r;
+      if (v > best) best = v;
+      const p = phys * (1 + reps / 30);
+      if (p > physBest) physBest = p;
     });
-    if (liftBest > 0) per.push({ id: e.id, name: e.name, eq: liftBest, r: e.std.r });
+
+    if (best <= 0) return;
+    const th = bw > 0
+      ? (own ? tableThresholds(e.std.table, sex, bw) : strengthThresholds(mg, sex, bw))
+      : null;
+    /* scoreFromMultiple only cares that its two arguments share a unit, so
+       kilos on both sides answer exactly what multiples of bodyweight on
+       both sides did. Kilos keep the two paths in one currency. */
+    per.push({
+      id: e.id, name: e.name, own: own, value: best, phys: physBest,
+      score: th ? clamp(scoreFromMultiple(best, th), 0, 100) : null,
+      anchor: own && e.std.table === anchorKey,
+    });
   });
-  per.sort((a, b) => a.eq - b.eq);
-  return {
-    best: best, from: from, stale: best === 0,
-    /* Every eligible lift's own estimate of the group's benchmark. When
-       these disagree the score is soft, and the reader should see that
-       rather than a confident single number built on the highest one. */
-    lifts: per,
-    low: per.length ? per[0].eq : 0,
-    lowFrom: per.length ? per[0].name : null,
-  };
+
+  const scored = per.filter((p) => p.score != null).sort((a, b) => a.score - b.score);
+  /* Kilos actually moved by the group's heaviest lift, with no table and
+     no conversion in it at all. This is what Str : BW is built on, and it
+     is deliberately a different question from the score: it moves only
+     when you lift more or weigh less, so it is the number to watch
+     through a bulk or a cut. */
+  const physBest = per.length ? Math.max.apply(null, per.map((p) => p.phys || 0)) : 0;
+  const base = { lifts: scored, all: per, physBest: physBest, stale: per.length === 0 };
+  if (!scored.length) {
+    return Object.assign(base, { score: null, scoreLow: null, scoreHigh: null, from: null, basis: null });
+  }
+  /* When the anchor lift is actually performed it simply wins, because
+     nothing is being inferred: it is the lift the table is about. */
+  const anchor = scored.filter((p) => p.anchor)[0];
+  return Object.assign(base, {
+    score: anchor ? anchor.score : median(scored.map((p) => p.score)),
+    scoreLow: scored[0].score,
+    scoreHigh: scored[scored.length - 1].score,
+    from: anchor ? anchor.name : scored.length === 1 ? scored[0].name : null,
+    basis: anchor ? "anchor" : scored.length === 1 ? "single" : "median",
+  });
 }
 
 function stdScores(asOf) {
@@ -3104,24 +3325,16 @@ function stdScores(asOf) {
   const out = {};
   MG_ORDER.forEach((mg) => {
     const b = stdBestFor(mg, asOf, bw);
-    /* Real thresholds come back in kg at this exact bodyweight; dividing
-       by bw here, not inside strengthThresholds(), keeps that function
-       reusable anywhere an absolute figure is more useful than a ratio. */
-    const std = strengthThresholds(mg, sex, bw).map((v) => (bw > 0 ? v / bw : 0));
-    const mult = bw > 0 ? b.best / bw : 0;
-    const lowMult = bw > 0 ? b.low / bw : 0;
-    const score = b.stale || !bw ? null : clamp(scoreFromMultiple(mult, std), 0, 100);
-    const scoreLow = b.stale || !bw ? null : clamp(scoreFromMultiple(lowMult, std), 0, 100);
     out[mg] = Object.assign({}, b, {
-      std: std, mult: mult, lowMult: lowMult,
+      std: strengthThresholds(mg, sex, bw),
       eligible: PROGRAMME.filter((e) => e.mg === mg && e.std).length,
-      score: score, scoreLow: scoreLow,
       /* One lift means nothing cross-checks it. A wide spread means the
-         conversion ratios disagree about you. Either way the reader is
-         told, instead of being handed a number that looks solid. */
-      confidence: b.stale ? null
+         lifts disagree about you, which now says something about you
+         rather than about two conversion ratios disagreeing with each
+         other. */
+      confidence: b.stale || b.score == null ? null
         : b.lifts.length < 2 ? "single"
-        : (score - scoreLow) > 20 ? "wide" : "ok",
+        : (b.scoreHigh - b.scoreLow) > 20 ? "wide" : "ok",
     });
   });
   return out;
@@ -3134,12 +3347,15 @@ function overallStd(ss) {
   return { score: score, cov: live.length, level: levelName(score) };
 }
 
-/** Strength to bodyweight: the five anchor-equivalents added up, over
- *  bodyweight. No standards table in it, so it is the honest number to
- *  watch through a bulk or a cut -- it moves only if you lift more or
- *  weigh less. */
+/** Strength to bodyweight: the heaviest lift in each of the five groups,
+ *  in kilos actually moved, added up and divided by bodyweight. No table
+ *  and, since 17 Sep 2026, no conversion ratio either, so it is the
+ *  honest number to watch through a bulk or a cut: it moves only if you
+ *  lift more or weigh less. The absolute figure shifted when the ratios
+ *  came out, because it used to divide each lift by one. The trend it
+ *  draws did not change shape. */
 function strengthToWeight(ss, bw) {
-  const total = MG_ORDER.reduce((a, g) => a + (ss[g].best || 0), 0);
+  const total = MG_ORDER.reduce((a, g) => a + (ss[g].physBest || 0), 0);
   return {
     total: total,
     ratio: bw > 0 ? total / bw : null,
@@ -3166,7 +3382,7 @@ function leanSeries() {
   inbodySorted().forEach((sc) => {
     if (!(sc.ffm > 0) || !sc.date) return;
     const ss = stdScores(sc.date);
-    const total = MG_ORDER.reduce((a, g) => a + (ss[g].best || 0), 0);
+    const total = MG_ORDER.reduce((a, g) => a + (ss[g].physBest || 0), 0);
     const bw = bwOn(sc.date) || sc.weight;
     if (!(total > 0) || !(bw > 0)) return;
     out.push({ date: sc.date, perBw: total / bw, perLean: total / sc.ffm, total: total, ffm: sc.ffm, bw: bw });
@@ -3672,17 +3888,17 @@ function dvRow(label, colour, pct, o) {
 function stdRow(mg, r) {
   const ticks = [25, 50, 75].map((v) => '<u style="left:' + v + '%"></u>').join("");
   const w = r.score == null ? 0 : clamp(r.score, 0, 100);
-  const lo = r.scoreLow == null ? 0 : clamp(r.scoreLow, 0, 100);
+  const hi = r.scoreHigh == null ? 0 : clamp(r.scoreHigh, 0, 100);
 
-  /* Solid to where the group's lifts still agree, pale from there to the
-     headline figure. The pale stretch is the part only your best lift is
-     claiming, so a long one means the score is the optimistic end of a
-     range rather than a reading. */
-  const hasBand = r.score != null && r.scoreLow != null && w - lo > 1;
+  /* Solid to the group's own figure, pale from there up to its best lift.
+     The figure is a median now, so it sits inside the range rather than at
+     the top of it: the pale stretch is what only your strongest lift in
+     the group is claiming, and a long one means they disagree about you. */
+  const hasBand = r.score != null && r.scoreHigh != null && hi - w > 1;
   const band = hasBand
-    ? '<b style="left:' + lo.toFixed(1) + "%;width:" + (w - lo).toFixed(1) + "%;background:" + MG[mg].c + '"></b>'
+    ? '<b style="left:' + w.toFixed(1) + "%;width:" + (hi - w).toFixed(1) + "%;background:" + MG[mg].c + '"></b>'
     : "";
-  const solid = hasBand ? lo : w;
+  const solid = w;
 
   const tag = r.confidence === "single"
     ? '<span class="conf" style="color:var(--warn);border-color:var(--warn-edge)">1 lift</span>'
@@ -3695,11 +3911,13 @@ function stdRow(mg, r) {
   let sub;
   if (r.score == null) {
     sub = r.eligible ? "no scoreable lift logged in eight weeks" : "nothing in this group can be scored";
-  } else if (r.lifts.length < 2) {
-    sub = "via " + esc(r.from) + " · " + n1(r.mult) + "\u00d7 bodyweight · nothing cross-checks it";
+  } else if (r.basis === "anchor") {
+    sub = "via " + esc(r.from) + ", the benchmark lift itself";
+  } else if (r.basis === "single") {
+    sub = "via " + esc(r.from) + " \u00b7 nothing cross-checks it";
   } else {
-    sub = "via " + esc(r.from) + " · " + n1(r.mult) + "\u00d7 bodyweight · your other lifts here say " +
-      Math.round(r.scoreLow) + " to " + Math.round(r.score);
+    sub = "median of " + r.lifts.length + " lifts \u00b7 they say " +
+      Math.round(r.scoreLow) + " to " + Math.round(r.scoreHigh);
   }
 
   return '<div class="std-row">' +
@@ -3776,8 +3994,8 @@ function trendMetrics() {
       pts: hist.filter((p) => p.std != null).map((p) => ({ x: p.date, y: p.std })),
       fmt: (v) => Math.round(v) + "/100",
       ref: 50, refLabel: "intermediate",
-      explain: "Best lift in each group, read against a real published table for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average. " +
-        "Legs, Chest and Shoulders are sourced from decades of competition classification data; Back and Arms from a large self-reported sample, the best real data available for two lifts no federation competes in. The ratio that converts a non-anchor lift into the group's benchmark is still this app's own estimate, so read the shape of this line more than its exact height.",
+      explain: "Each lift read against a real published table about that lift, for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite, with the group taking the median of its lifts. Cables and isolation work are excluded, and a group needs a scoreable lift inside the last eight weeks or it drops out of the average. " +
+        "Nothing is converted into anything else any more, so the conversion ratios that used to be this app's own guess are gone from this line entirely. It stepped down on 17 September 2026 when they went, most of it from arms: that is the estimate being removed, not strength being lost. Read the shape of the line, and treat anything spanning that date as two separate lines.",
       waiting: "Needs a bodyweight entry plus a barbell or dumbbell lift logged in two different weeks.",
     },
     bodyweight: {
@@ -4107,12 +4325,12 @@ function renderDash() {
   MG_ORDER.forEach((mg) => { out += stdRow(mg, ss[mg]); });
   out += '<div class="stack" style="margin-top:12px"><button class="btn-mini" onclick="go({page:\'strengthBreakdown\'})">Which lifts</button></div>';
   out += infoBody("strength",
-    "<p>Your best lift in each group, converted to what it implies for that group\u2019s benchmark movement, then read against a real published table for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. Cables and isolation work are excluded from feeding a lift into this: an unknown 2:1 pulley can halve the real load, and a group takes its best lift, so one loose conversion would swing the whole score.</p>" +
-    "<p><strong style=\"color:var(--text)\">Where the tables actually came from.</strong> Legs, Chest and Shoulders are squat, bench press and overhead press, from Dr. Lon Kilgore, PhD, published via ExRx.net: nearly seventy years of accumulated competitive weightlifting and powerlifting classification data, not a formula. Back and Arms are bent-over row and barbell curl, from Strength Level: 737,295 and 752,509 real self-reported lifts after their own filtering for implausible or duplicate entries. " +
-    "Neither row nor curl is contested in any federation, so nothing like Kilgore\u2019s decades of classification data exists for them at all \u2014 not a gap in the search, a gap in the sport. Treat Back and Arms as the softer two of the five for that reason: real and checkable, but self-reported rather than judged in competition.</p>" +
-    "<p><strong style=\"color:var(--text)\">What is still this app\u2019s own estimate.</strong> None of the five tables are. What still is: the ratio that converts a lift other than the anchor itself into what it implies for the anchor \u2014 a T-bar row read as slightly more than a bent-over row, a trap bar deadlift read as slightly more than a back squat, and so on. Those ratios were written from general familiarity with how the lifts compare, not measured, and they are the reason the pale stretch on a bar can run wide: solid to where your own lifts agree, pale to the figure only your single best-converting lift is claiming.</p>" +
-    "<p><strong style=\"color:var(--text)\">So how should you read it?</strong> More than before, but still a band, not a precise score. Read a group against itself over time. Read the ordering between groups, remembering Back and Arms sit on softer ground than the other three. " +
-    "Do not read this month against last month as progress: Progress since start is the number for that, and it has no tables or ratios in it at all.</p>") +
+    "<p>Your lifts in each group, each read against a real published table about that lift, for your bodyweight and sex: 25 novice, 50 intermediate, 75 advanced, 100 elite. The group takes the <strong style=\"color:var(--text)\">median</strong> of them, not the best, unless you actually perform the group\u2019s benchmark lift, in which case that one wins outright because nothing is being inferred. Cables and isolation work are excluded from feeding a lift into this: an unknown 2:1 pulley can halve the real load.</p>" +
+    "<p><strong style=\"color:var(--text)\">Nothing here is converted into anything else.</strong> Until 17 September 2026 a lift you performed was multiplied by a ratio to say what it implied for a lift you do not perform, and only then scored. Those ratios were written from general familiarity and no source, so although the benchmark tables were real, four of the five groups only reached one through an invented number. Every lift in this programme now has a published table of its own, so the ratios are gone. Your arms score fell by twenty points when they went, and your two arm lifts stopped disagreeing: they had never disagreed about you, the two ratios had disagreed with each other.</p>" +
+    "<p><strong style=\"color:var(--text)\">Where the tables come from, and they are not equally strong.</strong> Back squat, bench press and overhead press are Dr. Lon Kilgore, PhD, via ExRx.net: nearly seventy years of competitive classification data. Everything this programme actually uses is Strength Level, which is real and checkable but softer, being self-reported by one app\u2019s users rather than judged in competition. Sample size varies by twenty times across those, so any table below about a hundred thousand qualifying results is marked \u201cthin sample\u201d on the breakdown page rather than sitting silently beside one with twenty times the evidence.</p>" +
+    "<p><strong style=\"color:var(--text)\">What this trades away, honestly.</strong> Kilgore is the better source and you now touch none of it, because you perform none of squat, bench or overhead press. A good table reached by a made-up route is not a good measurement, so this is the right way round, but it does mean the strongest data in the app sits unused until you test one of those lifts. It also swaps one problem for another: each group is now measured against a differently self-selected crowd, and people who log Zercher squats are not a random sample.</p>" +
+    "<p><strong style=\"color:var(--text)\">So how should you read it?</strong> Read a group against itself over time. Read the ordering between groups loosely. The pale stretch on a bar is what only your strongest lift in that group claims, above the median the group actually scores. " +
+    "Do not read this month against last month as progress: Progress since start is the number for that, and it has no tables in it at all.</p>") +
     "</div>";
 
   const radarVals = {};
