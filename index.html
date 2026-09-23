@@ -1256,7 +1256,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.7 \u00b7 whoop feed";
+const VERSION = "2.7.1 \u00b7 whoop key fixes";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -2687,9 +2687,18 @@ function renderSettings() {
       '<div class="panel-label">Whoop</div>' +
       '<div class="stack" style="margin-bottom:10px">' +
       '<input class="field" value="' + esc(st.whoopUrl || "") + '" placeholder="Worker address, https://\u2026workers.dev" ' +
-        'autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" oninput="setSetting(\'whoopUrl\',this.value.trim())">' +
-      '<input class="field" type="password" value="' + esc(st.whoopKey || "") + '" placeholder="App key" ' +
-        'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="setSetting(\'whoopKey\',this.value.trim())">' +
+        'autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" onchange="setSetting(\'whoopUrl\',workerOrigin(this.value));render()">' +
+      /* Deliberately NOT type="password". A password field invites the
+         phone's password manager to fill it with a saved login, which is
+         exactly what happened the first time this was used: the key that
+         reached the Worker was not the key that was pasted. The dots come
+         from CSS instead, and Show turns them off. */
+      '<div class="row" style="gap:8px;align-items:center">' +
+      '<input class="field" style="flex:1' + (window.whoopKeyShown ? "" : ";-webkit-text-security:disc") + '" value="' + esc(st.whoopKey || "") + '" placeholder="App key" ' +
+        'name="gym-worker-key" autocomplete="off" data-1p-ignore data-lpignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+        'oninput="setSetting(\'whoopKey\',cleanKey(this.value))">' +
+      '<button class="btn-mini" onclick="window.whoopKeyShown=!window.whoopKeyShown;render()">' + (window.whoopKeyShown ? "Hide" : "Show") + "</button>" +
+      "</div>" +
       "</div>" +
       '<div class="body-copy" style="margin-bottom:12px">' + status + "</div>" +
       '<div class="stack"><button class="btn-secondary auto" onclick="syncWhoop(true)"' + (whoopBusy ? " disabled" : "") + ">" +
@@ -4677,9 +4686,28 @@ window.delWhoop = delWhoop;
    missed, not for correcting it. */
 const WHOOP_STALE_MS = 15 * 60 * 1000;
 let whoopBusy = false;
+window.whoopKeyShown = false;
+
+/* Only the Worker's origin is ever wanted here. Pasting the /auth link, or
+   the /callback address from the Whoop registration, into this field used
+   to send the app to the wrong route, which refuses exactly as a wrong key
+   does, and it also left the key sitting in plain text in the field. So
+   whatever is pasted is cut back to scheme and host. */
+function workerOrigin(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  try { return new URL(/^https?:\/\//i.test(s) ? s : "https://" + s).origin; }
+  catch (e) { return s.replace(/[?#].*$/, "").replace(/\/+$/, ""); }
+}
+window.workerOrigin = workerOrigin;
+
+/* The key is hex, so any whitespace in it is damage from copying, not
+   part of the key: a space or line break picked up by a paste. */
+const cleanKey = (v) => String(v || "").replace(/\s+/g, "");
+window.cleanKey = cleanKey;
 
 function whoopConfigured() {
-  return !!((state.settings.whoopUrl || "").trim() && (state.settings.whoopKey || "").trim());
+  return !!((state.settings.whoopUrl || "").trim() && cleanKey(state.settings.whoopKey));
 }
 
 function whoopSetting(patch) {
@@ -4723,13 +4751,20 @@ async function syncWhoop(manual) {
   if (whoopBusy) return;
   whoopBusy = true;
   if (manual) render();
-  const base = state.settings.whoopUrl.trim().replace(/\/+$/, "");
+  const base = workerOrigin(state.settings.whoopUrl);
   try {
     const res = await fetch(base + "/data", {
-      headers: { "x-gym-key": state.settings.whoopKey.trim() },
+      headers: { "x-gym-key": cleanKey(state.settings.whoopKey) },
       cache: "no-store",
     });
-    if (res.status === 403) throw new Error("The Worker refused the key. Check it under Setup.");
+    /* The length is the one thing about the key that is safe to show and
+       still diagnostic: a key from openssl rand -hex 24 is always 48, so
+       anything else means the field holds something other than the key. */
+    if (res.status === 403) {
+      const n = cleanKey(state.settings.whoopKey).length;
+      throw new Error("The Worker refused the key. The app has " + n + " character" + (n === 1 ? "" : "s") +
+        (n === 48 ? ", the right length, so one character differs." : "; a key from openssl is 48, so the field holds something else."));
+    }
     if (!res.ok) throw new Error("The Worker answered " + res.status + ".");
     const body = await res.json();
     const n = mergeWhoop(body.days);
