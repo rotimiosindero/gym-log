@@ -1256,7 +1256,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.6 \u00b7 own tables";
+const VERSION = "2.7 \u00b7 whoop feed";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1568,7 +1568,7 @@ async function copyText(text) {
 ------------------------------------------------------------------*/
 let state = { loads: {}, peaks: {}, log: [], bw: [], whoop: [], inbody: [], pendingSync: null,
   plan: { off: {}, order: {}, custom: [] },
-  settings: { vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, theme: "system" } };
+  settings: { vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, theme: "system", whoopUrl: "", whoopKey: "", whoopLastFetch: null, whoopError: null } };
 let view = { page: "home" };
 let err = null;
 let draft = null;      // in-progress exercise entry
@@ -1609,7 +1609,7 @@ function load() {
        about the programme, not a preference, and all three travel in the
        JSON backup for exactly that reason. */
     plan: Object.assign({ off: {}, order: {}, custom: [] }, (saved && saved.plan) || {}),
-    settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null, theme: "system" }, (saved && saved.settings) || {}),
+    settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null, theme: "system", whoopUrl: "", whoopKey: "", whoopLastFetch: null, whoopError: null }, (saved && saved.settings) || {}),
   };
 }
 
@@ -2672,6 +2672,33 @@ function renderSettings() {
     "</div>" +
     '<div class="body-copy">Vault name is what shows in Obsidian\u2019s vault switcher. The path is relative to the vault root, so a note in a folder reads Training/Gym.md. Appending needs the Advanced URI community plugin.</div>' +
     "</div>";
+
+  (function () {
+    const st = state.settings;
+    const fed = state.whoop.filter((r) => r.src === "whoop").length;
+    const status = !whoopConfigured()
+      ? "Not connected."
+      : st.whoopError
+        ? '<span style="color:var(--warn)">' + esc(st.whoopError) + "</span>"
+        : st.whoopLastFetch
+          ? "Last synced " + esc(agoText(st.whoopLastFetch)) + " \u00b7 " + fed + " day" + (fed === 1 ? "" : "s") + " from Whoop."
+          : "Saved, not synced yet.";
+    h += '<div class="panel">' +
+      '<div class="panel-label">Whoop</div>' +
+      '<div class="stack" style="margin-bottom:10px">' +
+      '<input class="field" value="' + esc(st.whoopUrl || "") + '" placeholder="Worker address, https://\u2026workers.dev" ' +
+        'autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" oninput="setSetting(\'whoopUrl\',this.value.trim())">' +
+      '<input class="field" type="password" value="' + esc(st.whoopKey || "") + '" placeholder="App key" ' +
+        'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="setSetting(\'whoopKey\',this.value.trim())">' +
+      "</div>" +
+      '<div class="body-copy" style="margin-bottom:12px">' + status + "</div>" +
+      '<div class="stack"><button class="btn-secondary auto" onclick="syncWhoop(true)"' + (whoopBusy ? " disabled" : "") + ">" +
+        (whoopBusy ? "Syncing\u2026" : "Sync now") + "</button></div>" +
+      '<div class="body-copy" style="margin-top:12px">Both come from your Cloudflare Worker, not from Whoop, and this app never sees a Whoop password or secret. ' +
+        "The key is what stops anyone else who finds the address from reading your recovery, so it is kept in this browser and your backup file and nowhere else, and treat that backup accordingly. " +
+        "Once set, the app checks for new numbers whenever you open it, at most every fifteen minutes.</div>" +
+      "</div>";
+  })();
 
   (function () {
     const th = state.settings.theme || "system";
@@ -4516,26 +4543,51 @@ function whoopContent() {
   const s7 = whoopStats(7), s28 = whoopStats(28);
   let out = "";
 
-  out += '<div class="placeholder" style="margin-bottom:14px">' +
-    "<strong>Space held for Whoop.</strong> Whoop does publish a developer API, but it authenticates with an OAuth client " +
-    "secret, and this page is static on GitHub Pages, which has nowhere safe to keep one. Pulling automatically needs a small " +
-    "server sitting in between, so until then it is hand-fed. The five fields below are exactly what Whoop reports, in Whoop's " +
-    "own units, so a live feed or a CSV export drops into this shape with no migration.</div>";
+  const latest = rows[0] || null;
+  /* The measured treatment is literal: it goes on only when the newest
+     numbers really did arrive from the strap. Days typed by hand, or a
+     feed that has not delivered yet, do not earn it, and it is not handed
+     out to make the page look consistent with Composition. */
+  const fed = !!latest && latest.src === "whoop";
+  const mcls = fed ? "panel measured" : "panel";
+  const connected = whoopConfigured();
 
-  out += '<div class="panel"><div class="panel-label">Log for ' + esc(fmtDay(today())) + "</div>" +
+  if (!connected) {
+    out += '<div class="placeholder" style="margin-bottom:14px">' +
+      "<strong>Whoop is not connected on this device.</strong> Add the Worker address and key under " +
+      '<button class="btn-back" style="margin:0;font-size:inherit" onclick="go({page:\'settings\'})">Setup</button>' +
+      " and these fill themselves. Until then they are typed by hand below.</div>";
+  } else if (state.settings.whoopError) {
+    out += '<div class="note" style="border-color:var(--warn-edge);background:var(--warn-tint)">' +
+      '<strong style="color:var(--warn)">Whoop did not sync.</strong> ' + esc(state.settings.whoopError) +
+      '<div class="stack" style="margin-top:10px"><button class="btn-mini" onclick="syncWhoop(true)">Try again</button></div></div>';
+  }
+  if (fed && latest.calibrating) {
+    out += '<div class="note">Whoop says it is still calibrating to you, so it does not yet stand behind its own recovery score. Treat the first couple of weeks as provisional.</div>';
+  }
+
+  const existing = state.whoop.filter((r) => r.date === today())[0];
+  let logPanel = '<div class="panel"><div class="panel-label">' +
+    (connected ? "Type today by hand" : "Log for " + esc(fmtDay(today()))) + "</div>" +
     '<div class="wgrid">';
   WHOOP_FIELDS.forEach((f) => {
-    const existing = state.whoop.filter((r) => r.date === today())[0];
     const v = existing && existing[f.k] != null ? existing[f.k] : "";
-    out += '<div><label for="w_' + f.k + '">' + esc(f.label) + (f.unit ? " (" + esc(f.unit) + ")" : "") + "</label>" +
+    logPanel += '<div><label for="w_' + f.k + '">' + esc(f.label) + (f.unit ? " (" + esc(f.unit) + ")" : "") + "</label>" +
       '<input class="field" id="w_' + f.k + '" type="number" step="0.1" inputmode="decimal" value="' + esc(String(v)) + '"></div>';
   });
-  out += "</div>" +
+  logPanel += "</div>" +
     '<div class="stack" style="margin-top:14px"><button class="btn-primary auto" onclick="saveWhoop()">Save today</button></div>' +
-    '<div class="hint">Leave anything you do not have blank. Strain is Whoop’s 0-21 scale.</div></div>';
+    '<div class="hint">' + (connected
+      ? "For a day the strap missed. Anything Whoop does report replaces what is typed here on the next sync, because the strap is the instrument and typing was always a stand-in for it."
+      : "Leave anything you do not have blank. Strain is Whoop\u2019s 0-21 scale.") + "</div></div>";
+  /* Not connected, typing is the only way in, so it leads. Connected, it is
+     a fallback, so it goes below the numbers instead of above them. */
+  if (!connected) out += logPanel;
 
   if (s28.n) {
-    out += '<div class="panel"><div class="panel-label">Averages</div>' +
+    out += '<div class="' + mcls + '"><div class="panel-label">Averages</div>' +
+      (fed ? '<div class="reading-when">From Whoop' +
+        (state.settings.whoopLastFetch ? ", synced " + esc(agoText(state.settings.whoopLastFetch)) : "") + "</div>" : "") +
       '<div class="kv">' + WHOOP_FIELDS.map((f) => {
         const v = s7[f.k] != null ? s7[f.k] : s28[f.k];
         return '<div><div class="k">' + esc(f.label) + "</div><div class=\"v\">" + (v == null ? "--" : esc(String(n1(v)))) +
@@ -4559,21 +4611,24 @@ function whoopContent() {
 
     const recPts = whoopSorted().filter((r) => r.recovery != null).map((r) => ({ x: r.date, y: r.recovery }));
     if (recPts.length >= 2) {
-      out += '<div class="panel"><div class="panel-label">Recovery</div>' +
+      out += '<div class="' + mcls + '"><div class="panel-label">Recovery</div>' +
         lineChart([{ pts: recPts, c: "var(--pb)", area: true }], { h: 118, yMin: 0, yMax: 100, fmt: (v) => Math.round(v) + "%" }) + "</div>";
     }
     const sleepPts = whoopSorted().filter((r) => r.sleep != null).map((r) => ({ x: r.date, y: r.sleep }));
     if (sleepPts.length >= 2) {
-      out += '<div class="panel"><div class="panel-label">Sleep</div>' +
+      out += '<div class="' + mcls + '"><div class="panel-label">Sleep</div>' +
         lineChart([{ pts: sleepPts, c: "var(--mg-shoulders)", area: true }], { h: 110, ref: 8, refLabel: "8h", fmt: (v) => n1(v) + "h" }) + "</div>";
     }
   }
+
+  if (connected) out += logPanel;
 
   if (rows.length) {
     let list = "";
     rows.slice(0, 30).forEach((r) => {
       const bits = WHOOP_FIELDS.filter((f) => r[f.k] != null).map((f) => n1(r[f.k]) + f.unit);
-      list += '<div class="list-row"><span>' + esc(fmtDay(r.date)) + "</span>" +
+      list += '<div class="list-row"><span>' + esc(fmtDay(r.date)) +
+        (r.src === "whoop" ? ' <span style="color:var(--muted);font-size:12px">\u00b7 Whoop</span>' : "") + "</span>" +
         '<span style="color:var(--muted);text-align:right">' + esc(bits.join(" · ") || "empty") +
         '<button class="btn-back" style="margin:0 0 0 10px;font-size:13px" onclick="delWhoop(\'' + esc(r.date) + '\')">Remove</button></span></div>';
     });
@@ -4605,6 +4660,113 @@ function delWhoop(date) {
   render();
 }
 window.delWhoop = delWhoop;
+
+/* ---------------- Whoop feed ----------------
+   The Worker (a separate project, not in this repository) holds the Whoop
+   secret and a rotating token, pulls every thirty minutes, and keeps the
+   result ready. This end only reads that result: it never talks to Whoop
+   and never sees a Whoop credential. What it does hold is the Worker's
+   address and a key the Worker demands, both typed into Setup and kept
+   in this browser and its backup file, never in the source, since the
+   source is public and the key is what stands between a stranger and
+   your recovery numbers.
+
+   The feed WINS over typing for any field it supplies, because it is the
+   instrument and typing was always a stand-in for it. A field it does not
+   supply keeps whatever was typed. So typing is now for the days the strap
+   missed, not for correcting it. */
+const WHOOP_STALE_MS = 15 * 60 * 1000;
+let whoopBusy = false;
+
+function whoopConfigured() {
+  return !!((state.settings.whoopUrl || "").trim() && (state.settings.whoopKey || "").trim());
+}
+
+function whoopSetting(patch) {
+  persist({ settings: Object.assign({}, state.settings, patch) });
+}
+
+/** Folds the Worker's rows into state.whoop. Returns how many days changed. */
+function mergeWhoop(days) {
+  const byDate = {};
+  state.whoop.forEach((r) => { byDate[r.date] = r; });
+  let changed = 0;
+  (days || []).forEach((d) => {
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.date))) return;
+    const prev = byDate[d.date] || { date: d.date, ts: Date.now() };
+    const next = Object.assign({}, prev);
+    let got = false, moved = false;
+    WHOOP_FIELDS.forEach((f) => {
+      const v = d[f.k];
+      /* Out-of-range values are dropped, not clamped. A number past a
+         field's ceiling is far more likely a units change on Whoop's side
+         (HRV in seconds, sleep in minutes) than a real reading, and a
+         silently clamped one would look plausible. */
+      if (typeof v !== "number" || !isFinite(v) || v < 0 || v > f.max) return;
+      got = true;
+      if (next[f.k] !== v) { next[f.k] = v; moved = true; }
+    });
+    if (!got) return;
+    if (prev.src !== "whoop" || !!prev.calibrating !== !!d.calibrating) moved = true;
+    next.src = "whoop";
+    if (d.calibrating) next.calibrating = true; else delete next.calibrating;
+    byDate[d.date] = next;
+    if (moved) changed++;
+  });
+  if (changed) persist({ whoop: Object.keys(byDate).map((k) => byDate[k]) });
+  return changed;
+}
+
+async function syncWhoop(manual) {
+  if (typeof DEMO !== "undefined" && DEMO) { if (manual) flash("Demo data: nothing is fetched"); return; }
+  if (!whoopConfigured()) { if (manual) flash("Add the Worker address and key under Setup first"); return; }
+  if (whoopBusy) return;
+  whoopBusy = true;
+  if (manual) render();
+  const base = state.settings.whoopUrl.trim().replace(/\/+$/, "");
+  try {
+    const res = await fetch(base + "/data", {
+      headers: { "x-gym-key": state.settings.whoopKey.trim() },
+      cache: "no-store",
+    });
+    if (res.status === 403) throw new Error("The Worker refused the key. Check it under Setup.");
+    if (!res.ok) throw new Error("The Worker answered " + res.status + ".");
+    const body = await res.json();
+    const n = mergeWhoop(body.days);
+    whoopSetting({ whoopLastFetch: Date.now(), whoopError: null });
+    if (manual) flash(n ? "Whoop: " + n + " day" + (n === 1 ? "" : "s") + " updated" : "Whoop: already up to date");
+  } catch (e) {
+    /* A failed fetch in a browser usually means no signal, or the address
+       is wrong; the browser deliberately will not say which. */
+    const msg = e && e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message)
+      ? e.message : "Could not reach the Worker. No signal, or the address is wrong.";
+    whoopSetting({ whoopError: msg });
+    if (manual) flash(msg);
+  } finally {
+    whoopBusy = false;
+    /* A background sync must not re-render under someone mid-way through
+       typing a set: the page is rebuilt wholesale and the field would go. */
+    const a = document.activeElement;
+    if (manual || !a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) render();
+  }
+}
+window.syncWhoop = syncWhoop;
+
+function syncWhoopIfStale() {
+  if (!whoopConfigured()) return;
+  const last = state.settings.whoopLastFetch || 0;
+  if (Date.now() - last > WHOOP_STALE_MS) syncWhoop(false);
+}
+
+function agoText(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " min ago";
+  const h = Math.round(m / 60);
+  if (h < 24) return h + " hour" + (h === 1 ? "" : "s") + " ago";
+  const d = Math.round(h / 24);
+  return d + " day" + (d === 1 ? "" : "s") + " ago";
+}
 
 /** Bodyweight quick entry, on the home screen because it is a daily habit
  *  that has nothing to do with being at the rack. */
@@ -5361,6 +5523,10 @@ if (DEMO) { state = Object.assign({}, state, demoState(), { pendingSync: null })
 rebuildProgramme();
 applyTheme();
 render();
+syncWhoopIfStale();
+/* A home-screen app on iOS is resumed, not reloaded, so opening it in the
+   morning would otherwise show last night's numbers until a manual sync. */
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncWhoopIfStale(); });
 </script>
 </body>
 </html>

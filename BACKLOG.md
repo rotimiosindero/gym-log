@@ -43,6 +43,12 @@ What stops it being pleasant for someone who is not me:
    `navigator.standalone` is false, explaining that installing it is what stops
    Safari clearing the data after seven days of not visiting. Plus an
    `apple-touch-icon`, since the home screen currently gets a screenshot.
+5. **A real privacy policy.** Whoop requires a privacy policy URL to register
+   an app, and the gym log's own address was used as a placeholder on 23 Sep
+   2026. Fine while the only user is me; not fine the moment anyone else
+   connects their Whoop. A short honest page: tokens and cached numbers in
+   Cloudflare, everything else in the person's own browser, shared with no
+   one. Publishing it is a change to a public repo, so it needs a go-ahead.
 
 **This does not give cross-device sync**, for me or anyone. Without a server
 there is no channel between two devices, so hand export and import remains the
@@ -70,18 +76,35 @@ safest shape, because a stale device then corrects itself.
 
 ## 3. Whoop
 
-**Status:** designed 8 Sep 2026, blocked. Do not build until I own a Whoop.
+**Status: BUILT 23 Sep 2026.** The feed runs and fills the five Recovery
+fields. Listed here for what it deliberately does not do yet.
 
-Recovery, Strain, HRV, resting heart rate and sleep stay hand-typed until then.
-Route already chosen: a Cloudflare Worker proxy with `/auth` and `/callback`,
-holding the rotated refresh token in Workers KV. A static page cannot call
-Whoop directly, and this is settled rather than assumed: the token exchange
-needs a `client_secret` that Whoop's own guidance says must never reach a
-client. A scheduled GitHub Action was rejected because this repo is public and
-that would publish health data.
+The Worker lives OUTSIDE this repo, in `../gym-log-whoop/worker.js`, because
+this repo is public and the endpoint is better not advertised. The app holds
+only the Worker's address and a key, typed into Setup, never in source.
 
-API specifics are recorded in the project memory and should be re-checked
-before building, since they move.
+The design changed from the September plan in one important way. WHOOP
+rotates refresh tokens, and of two concurrent refreshes only the first
+succeeds. Workers KV has no compare-and-swap, so if ordinary requests could
+refresh, two overlapping ones could kill the stored credential. So the cron
+run every thirty minutes is the ONLY thing that touches a token: it refreshes,
+pulls, and caches. The app just reads the cache. Do not add a refresh to the
+Worker's request handler.
+
+The September plan also left the data route and `/callback` unprotected. Both
+now need the key (the callback via a single-use state that only a keyed
+`/auth` can issue), which stops a stranger reading the data or overwriting
+the stored token with their own WHOOP account.
+
+**Next, in order of value:**
+1. **A deload flag.** Several days of falling recovery with rising strain,
+   surfaced before the hole is dug. Actionable, needs only weeks of data.
+2. **Chart HRV and resting heart rate.** They appear only in averages today,
+   because typed data was too sparse to draw. HRV drift below baseline is the
+   useful early warning.
+3. **The strength versus sleep / recovery analysis** discussed 17 Sep. Needs
+   months of paired data, converted into same-session questions, with the
+   questions fixed in advance rather than discovered.
 
 ---
 
