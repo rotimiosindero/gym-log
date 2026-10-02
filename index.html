@@ -1027,6 +1027,21 @@ function tagExercise(e) {
 }
 BASE_PROGRAMME.forEach(tagExercise);
 
+/* The same lift trained in two sessions. Calves are done on both leg days,
+   so the two entries are one lift: they share a working weight, a peak and
+   the history that progress is judged from, and logging either one moves
+   both. Each session still records its entries under its own name, so the
+   log and the Obsidian export are unchanged. */
+const TWIN = { la5: "lb6", lb6: "la5" };
+
+/** Every set entry for this lift, its twin's included. */
+const liftSets = (exId, log) =>
+  (log || state.log).filter((l) => l.type === "set" && (l.exId === exId || l.exId === TWIN[exId]));
+
+/** Writes one value for a lift and, if it has one, its twin. */
+const withTwin = (map, exId, v) =>
+  Object.assign({}, map, { [exId]: v }, TWIN[exId] ? { [TWIN[exId]]: v } : {});
+
 /** Folds this device's custom exercises into the shipped programme. Runs
  *  once at boot and again whenever the custom list itself changes, adding
  *  or removing a lift. Benching and reordering do not call this: neither
@@ -1256,7 +1271,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.8 \u00b7 whoop workouts";
+const VERSION = "2.9 \u00b7 today first";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1300,7 +1315,7 @@ function esc(s) {
  * whether the lift is moving, stalling, plateaued or declining.
  */
 function statusFor(exId, log) {
-  const ent = log.filter((l) => l.exId === exId && l.type === "set").sort((a, b) => a.ts - b.ts);
+  const ent = liftSets(exId, log).sort((a, b) => a.ts - b.ts);
   if (ent.length === 0) return { code: "new", label: "No data yet", tone: C.muted, streak: 0 };
 
   const latest = ent[ent.length - 1];
@@ -1309,7 +1324,17 @@ function statusFor(exId, log) {
     if (ent[i].load !== latest.load) break;
     run.unshift(ent[i]);
   }
-  if (run.length === 1) return { code: "ok", label: "First session at this load", tone: C.muted, streak: 0 };
+  /* One session at this load means nothing to compare reps against yet, so
+     there is no verdict to give. The label is read on the exercise page
+     BEFORE the next session, so it speaks about that session: staying at
+     this load makes it the second. The old wording, "First session at
+     this load", described the session already done and read as though
+     today were the first time at the weight. */
+  if (run.length === 1) {
+    const earlier = ent.filter((e) => e.load === latest.load).length - 1;
+    return { code: "ok", label: earlier > 0 ? "Second session back at this weight" : "Second session at this weight",
+             tone: C.muted, streak: 0 };
+  }
 
   let streak = 0;
   let declines = 0;
@@ -1343,15 +1368,84 @@ function statusFor(exId, log) {
     : null;
   const workingHarder = streak >= 2 && rirDrop != null && rirDrop >= 1;
 
-  if (declines >= 2) return { code: "decline", label: "Declining", tone: C.bad, streak, rirDrop };
+  /* Labels say what to do in the session coming up, since that is when
+     they are read. The history behind them is in the explanation on the
+     exercise page, and the Programme health page keeps the plain names. */
+  if (declines >= 2) return { code: "decline", label: "Come down today", tone: C.bad, streak, rirDrop };
   if (workingHarder) {
-    return { code: "fatigue", label: "Harder for the same, " + streak + " sessions",
+    return { code: "fatigue", label: "Hold the weight, don\u2019t chase reps",
              tone: C.warn, streak, rirDrop };
   }
-  if (streak >= 3) return { code: "plateau", label: "Plateau, " + streak + " sessions", tone: C.bad, streak, rirDrop };
-  if (streak === 2) return { code: "stall", label: "Stall, 2 sessions", tone: C.warn, streak, rirDrop };
-  if (streak === 1) return { code: "s1", label: "No rep gain last session", tone: C.warn, streak };
+  if (streak >= 3) return { code: "plateau", label: "Deload today, or hold one more", tone: C.bad, streak, rirDrop };
+  if (streak === 2) return { code: "stall", label: "Third go at these reps", tone: C.warn, streak, rirDrop };
+  if (streak === 1) return { code: "s1", label: "Needs a rep today", tone: C.warn, streak };
   return { code: "ok", label: "Progressing", tone: C.pb, streak: 0 };
+}
+
+/** The status pill on the exercise page, for the weight about to be lifted.
+ *  That is the weight in the box, which only differs from the stored one
+ *  once you change it, so moving up says "first" on that day and only
+ *  that day, and going back to an old weight says when it was last used.
+ *  Staying put falls through to the ordinary verdict from statusFor. */
+function loadPill(ex, v) {
+  const st = statusFor(ex.id, state.log);
+  const plain = st.code !== "new" ? pill(st.label, st.tone) : "";
+  if (ex.unit === "bw" || isNaN(v)) return plain;
+  const sets = liftSets(ex.id).sort((a, b) => b.ts - a.ts);
+  if (!sets.length) return plain;
+  const at = sets.filter((l) => l.load === v);
+  if (!at.length) return pill("First session at this weight", C.accent);
+  if (sets[0].load !== v) return pill("Back at this weight, last done " + fmtDay(at[0].date), C.muted);
+  return plain;
+}
+
+/** This morning's Whoop recovery, or null. Shown as information only: no
+ *  published threshold says what a given score should change in a session,
+ *  so the app does not pretend to know. */
+function todayRecovery() {
+  const r = (state.whoop || []).find((w) => w.date === today());
+  return r && r.recovery != null ? r.recovery : null;
+}
+
+/** What the status means for today, under the pill on the exercise page. */
+function statusAdvice(ex, st, target) {
+  const box = (t) => '<div class="body-copy" style="margin-top:12px">' + t + "</div>";
+  const down = target == null ? null : fmtLoad(ex, roundToInc(target * (1 - DELOAD_PCT), ex.inc || 1));
+  const button = down ? " The Deload button below takes it to " + esc(down) + "." : "";
+  if (st.code === "decline") {
+    return box("Reps have gone backwards twice running at this weight. Come down today." + button);
+  }
+  if (st.code === "plateau") {
+    return box(st.streak + " sessions without a rep gain at this weight, with reps in reserve holding steady, so this reads as the lift rather than you. " +
+      "Deload today, or hold one more session and see whether others in this session follow." + button);
+  }
+  if (st.code === "stall") {
+    return box("Two sessions without a rep gain at this weight. Beat any one set today and it is moving again; flat a third time makes it a plateau.");
+  }
+  if (st.code === "fatigue") {
+    const rec = todayRecovery();
+    return box("Reps have not moved for " + st.streak + " sessions, but you are finishing " + st.rirDrop + " rep" + (st.rirDrop === 1 ? "" : "s") +
+      " closer to failure than when the stall began. That points at recovery, sleep or the deficit rather than this lift. " +
+      "Keep the weight today and stop at the reps you have rather than grinding for one more. Deloading the bar would treat the wrong thing." +
+      (rec != null ? ' Whoop recovery this morning: <b style="color:' + recoveryTone(rec) + '">' + Math.round(rec) + "%</b>." : ""));
+  }
+  return "";
+}
+
+/** The line at the top of the reps panel, for the weight in the box. */
+function repsIntro(ex, sets, v) {
+  const p = (t) => '<div class="body-copy" id="repsIntro" style="margin-bottom:14px">' + t + "</div>";
+  const nums = (r) => '<span style="color:var(--text);font-weight:600">' + esc(r.join(", ")) + "</span>";
+  const at = isNaN(v) ? null : sets.find((l) => l.load === v);
+  if (at) {
+    return p("Today: beat " + nums(at.reps) + (ex.unit === "bw" ? "" : " at " + esc(fmtLoad(ex, v))) +
+      ". One more " + (ex.repUnit === "sec" ? "second" : "rep") + " on any set counts.");
+  }
+  if (sets.length) {
+    return p("First session at " + esc(isNaN(v) ? "this weight" : fmtLoad(ex, v)) + ". Last time, " + esc(fmtLoad(ex, sets[0].load)) +
+      " for " + nums(sets[0].reps) + ". Aim for at least " + ex.lo + " on every set.");
+  }
+  return p("No history yet. Start at the bottom of the range.");
 }
 
 /* ==================================================================
@@ -1581,6 +1675,7 @@ let exportOpen = false;
 let infoOpen = null;      // which panel has its explanation open, if any
 let bodySeg = "weight";   // Body tab segment: weight | composition | recovery
 let sessionEdit = false;  // whether the current session page is in Edit exercises mode
+let historyOpen = false;  // whether an exercise page shows its recent sessions
 
 function load() {
   let saved = null;
@@ -1612,6 +1707,22 @@ function load() {
     plan: Object.assign({ off: {}, order: {}, custom: [] }, (saved && saved.plan) || {}),
     settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null, theme: "system", whoopUrl: "", whoopKey: "", whoopLastFetch: null, whoopError: null }, (saved && saved.settings) || {}),
   };
+
+  /* Bring twinned lifts into step, which matters once: before the twin
+     existed they were logged separately and can disagree. The weight comes
+     from whichever was logged or deloaded most recently; the peak is the
+     higher of the two. */
+  Object.keys(TWIN).forEach((a) => {
+    const b = TWIN[a];
+    if (!(a in state.loads) || !(b in state.loads)) return;
+    const last = state.log.filter((l) => (l.exId === a || l.exId === b) && (l.type === "set" || l.type === "deload"))
+      .sort((x, y) => y.ts - x.ts)[0];
+    if (last && last.exId === a) state.loads[b] = state.loads[a];
+    const pa = state.peaks[a], pb = state.peaks[b];
+    if (pa != null || pb != null) {
+      state.peaks[a] = state.peaks[b] = Math.max(pa == null ? -Infinity : pa, pb == null ? -Infinity : pb);
+    }
+  });
 }
 
 function persist(patch) {
@@ -1941,6 +2052,11 @@ function renderSession() {
       (tm.workout.zones ? '<div class="hint" style="margin:4px 0 0">' + esc(zoneLine(tm.workout)) + "</div>" : "") + "</div>";
   }
 
+  const rec = todayRecovery();
+  if (rec != null) {
+    h += '<div class="hint" style="margin:0 0 12px">Whoop recovery this morning: <b style="color:' + recoveryTone(rec) + '">' + Math.round(rec) + "%</b></div>";
+  }
+
   const exs = sessionExercises(s.id);
   if (!exs.length) {
     h += '<div class="panel"><div class="body-copy">Every exercise here is benched. ' +
@@ -1953,6 +2069,14 @@ function renderSession() {
     const pk = state.peaks[e.id];
     const atPB = load != null && pk != null && load >= pk;
     const alarm = st.code === "plateau" || st.code === "decline";
+    /* What to do at this lift today, so the session reads as a plan before
+       it starts: the weight to move to if the range was filled, otherwise
+       the reps to beat at the stored weight. */
+    const lastAt = liftSets(e.id).sort((a, b) => b.ts - a.ts).find((l) => l.load === load);
+    const sg = lastAt ? suggestLoad(e, lastAt.reps, lastAt.rir, lastAt.load) : null;
+    const plan = sg
+      ? '<span style="font-size:12px;font-weight:600;color:' + (sg.dir > 0 ? C.pb : C.warn) + '">Today: ' + esc(fmtLoad(e, sg.load)) + "</span>"
+      : lastAt ? '<span style="font-size:12px;color:var(--text)">Beat ' + esc(lastAt.reps.join(", ")) + "</span>" : "";
     h += '<button class="card tight' + (alarm ? " alarm" : "") + '" onclick="go({page:\'exercise\',exId:\'' + e.id + '\'})">' +
       '<div class="row baseline">' +
       '<div class="name sm">' + esc(e.name) + (e.opt ? ' <span class="opt">(if time)</span>' : "") + "</div>" +
@@ -1960,6 +2084,7 @@ function renderSession() {
       "</div>" +
       '<div class="stack" style="margin-top:8px;gap:8px;align-items:center">' +
       '<span style="font-size:12px;color:var(--muted)">' + e.sets + " \u00d7 " + e.lo + "\u2013" + e.hi + (e.repUnit === "sec" ? "s" : "") + "</span>" +
+      plan +
       (pk != null && !atPB ? pill(fmtLoad(e, pk) + " peak", C.muted) : "") +
       (st.code !== "new" && st.code !== "ok" ? pill(st.label, st.tone) : "") +
       "</div></button>";
@@ -2228,18 +2353,18 @@ function renderExercise() {
   const peak = state.peaks[ex.id];
   const st = statusFor(ex.id, state.log);
 
-  const sets = state.log.filter((l) => l.exId === ex.id && l.type === "set").sort((a, b) => b.ts - a.ts);
+  const sets = liftSets(ex.id).sort((a, b) => b.ts - a.ts);
   const lastSet = sets[0] || null;
-  // The most recent session at this exact load is the one that matters for
+  // The most recent session at the stored load is the one that matters for
   // double progression: you are trying to beat it.
-  const lastAtLoad = sets.find((l) => l.load === target) || null;
+  const lastAtTarget = sets.find((l) => l.load === target) || null;
   /* Read off the last session at this exact load, which is the session the
      next load is supposed to answer. Once you change the load in the box
      below, the live version further down takes over. */
-  const sgNext = lastAtLoad ? suggestLoad(ex, lastAtLoad.reps, lastAtLoad.rir, lastAtLoad.load) : null;
+  const sgNext = lastAtTarget ? suggestLoad(ex, lastAtTarget.reps, lastAtTarget.rir, lastAtTarget.load) : null;
 
   if (!draft) {
-    const src = lastAtLoad || lastSet;
+    const src = lastAtTarget || lastSet;
     const reps = Array(ex.sets).fill(ex.lo).map((d, i) => {
       if (!src) return d;
       return src.reps[i] !== undefined ? src.reps[i] : (src.reps[src.reps.length - 1] !== undefined ? src.reps[src.reps.length - 1] : d);
@@ -2247,10 +2372,13 @@ function renderExercise() {
     draft = { reps: reps, rir: lastSet && lastSet.rir != null ? lastSet.rir : 1, load: target == null ? "" : String(target), formReset: false, note: "" };
   }
 
-  const history = state.log.filter((l) => l.exId === ex.id).sort((a, b) => b.ts - a.ts).slice(0, 6);
+  const history = state.log.filter((l) => l.exId === ex.id || l.exId === TWIN[ex.id]).sort((a, b) => b.ts - a.ts).slice(0, 6);
   const loadNum = parseFloat(draft.load);
   const effLoad = ex.unit === "bw" ? 0 : loadNum;
   const valid = !isNaN(loadNum) || ex.unit === "bw";
+  // What the reps are compared against: the last session at the weight in
+  // the box, which is the weight about to be lifted.
+  const lastAtLoad = valid ? sets.find((l) => l.load === effLoad) || null : null;
   const allTop = draft.reps.every((r) => r >= ex.hi);
   const isPB = ex.unit !== "bw" && (peak == null || effLoad > peak) && !draft.formReset;
 
@@ -2270,16 +2398,9 @@ function renderExercise() {
     (target != null && peak != null && target < peak ? pill("Peak " + fmtLoad(ex, peak), C.warn) : "") +
     (target != null && peak != null && target >= peak && ex.unit !== "bw" ? pill("At peak", C.pb) : "") +
     (target == null && ex.unit !== "bw" ? pill("No load set yet", C.warn) : "") +
-    (st.code !== "new" ? pill(st.label, st.tone) : "") +
+    '<span id="loadPill">' + loadPill(ex, parseFloat(draft.load)) + "</span>" +
     "</div>" +
-    ((st.code === "plateau" || st.code === "decline")
-      ? '<div class="body-copy" style="margin-top:12px">' + st.streak +
-        " sessions without a rep gain, and your reps in reserve have held steady, so this looks like the lift rather than you. Options are a deload, or leaving it and watching whether others in this session follow.</div>"
-      : st.code === "fatigue"
-        ? '<div class="body-copy" style="margin-top:12px">Reps have not moved for ' + st.streak +
-          " sessions, but you are finishing " + st.rirDrop + " rep" + (st.rirDrop === 1 ? "" : "s") +
-          " closer to failure than when the stall began. The same work is costing more, which points at recovery, sleep or the deficit rather than at this lift. Deloading the bar would treat the wrong thing.</div>"
-        : "") +
+    statusAdvice(ex, st, target) +
     "</div>";
 
   /* Stand the callout down once you have taken it: the load box below
@@ -2287,7 +2408,7 @@ function renderExercise() {
      been accepted reads as though nothing happened. */
   if (sgNext && parseFloat(draft.load) !== sgNext.load) {
     h += '<div class="suggest' + (sgNext.dir < 0 ? " down" : "") + '">' +
-      '<div class="panel-label">' + (sgNext.dir < 0 ? "Suggested: come down" : "Suggested: move up") + "</div>" +
+      '<div class="panel-label">' + (sgNext.dir < 0 ? "Today: come down" : "Today: move up") + "</div>" +
       '<div class="suggest-row">' +
       '<div class="suggest-val">' + esc(ex.unit === "pin" ? '"' + fmtPin(sgNext.load) + '"' : String(sgNext.load)) +
       "<span>" + (ex.unit === "pin" ? " pin" : "kg") + "</span></div>" +
@@ -2314,15 +2435,7 @@ function renderExercise() {
 
   // Reps
   h += '<div class="panel"><div class="panel-label">' + (ex.repUnit === "sec" ? "Seconds per set" : "Reps per set") + "</div>";
-  if (lastAtLoad) {
-    h += '<div class="body-copy" style="margin-bottom:14px">Starting from last session at ' + esc(fmtLoad(ex, target)) + ", " + esc(lastAtLoad.date) +
-      ': <span style="color:var(--text);font-weight:600">' + esc(lastAtLoad.reps.join(", ")) + "</span>. Beat any one set to progress.</div>";
-  } else if (lastSet) {
-    h += '<div class="body-copy" style="margin-bottom:14px">First session at ' + esc(fmtLoad(ex, target)) + ". Carried over from " + esc(fmtLoad(ex, lastSet.load)) + " on " + esc(lastSet.date) +
-      ': <span style="color:var(--text);font-weight:600">' + esc(lastSet.reps.join(", ")) + "</span>.</div>";
-  } else {
-    h += '<div class="body-copy" style="margin-bottom:14px">No history yet. Starting at the bottom of the range.</div>';
-  }
+  h += repsIntro(ex, sets, effLoad);
 
   draft.reps.forEach((r, i) => {
     const prev = lastAtLoad ? lastAtLoad.reps[i] : undefined;
@@ -2339,7 +2452,7 @@ function renderExercise() {
   });
 
   h += '<div class="stack" style="margin-top:10px;gap:8px">' +
-    (lastAtLoad ? '<button class="btn-mini" onclick="resetReps()">Reset to last session</button>' : "") +
+    (lastAtLoad ? '<button class="btn-mini" onclick="resetReps()">Reset to last time</button>' : "") +
     '<button class="btn-mini" onclick="fillReps(' + ex.lo + ')">All ' + ex.lo + "</button>" +
     '<button class="btn-mini" onclick="fillReps(' + ex.hi + ')">All ' + ex.hi + "</button>" +
     "</div>";
@@ -2374,10 +2487,16 @@ function renderExercise() {
       : '<div class="hint">Deload drops the working load to ' + esc(fmtLoad(ex, roundToInc(target * 0.7, ex.inc || 1))) +
         " and leaves your peak untouched" + (peak == null ? "." : ", so a future return to " + esc(fmtLoad(ex, peak)) + " still counts as re-attainment rather than a PB.") + "</div>");
 
+  /* Folded away by default: the reps to beat are already at the top of the
+     reps panel, and the full list is for checking an entry, not for the
+     session itself. */
   if (history.length) {
-    h += '<div class="mt-lg"><div class="body-copy" style="margin-bottom:10px">Recent sessions</div>';
-    history.forEach((l) => {
-      h += '<div class="list-row"><span style="color:var(--muted)">' + esc(l.date) + "</span><span>" +
+    h += '<div class="mt-lg"><button class="btn-mini" onclick="toggleHistory()">' +
+      (historyOpen ? "Hide history" : "History \u00b7 last " + history.length) + "</button>";
+    if (historyOpen) h += '<div style="margin-top:10px"></div>';
+    (historyOpen ? history : []).forEach((l) => {
+      const other = l.exId !== ex.id ? SESSIONS.find((x) => x.id === BY_ID[l.exId].s) : null;
+      h += '<div class="list-row"><span style="color:var(--muted)">' + esc(l.date) + (other ? " \u00b7 " + esc(other.name) : "") + "</span><span>" +
         (l.type === "deload"
           ? '<span style="color:var(--warn)">Deload to ' + esc(fmtLoad(ex, l.load)) + "</span>"
           : esc(fmtLoad(ex, l.load)) + " \u00b7 " + esc(l.reps.join(",")) +
@@ -2413,14 +2532,14 @@ const HEALTH_ORDER = [
   { code: "s1", label: "One flat session", tone: C.warn,
     note: "Ordinary, and here for completeness rather than for action." },
   { code: "ok", label: "Progressing", tone: C.pb,
-    note: "Reps went up last session, or it is the first session at a new load." },
+    note: "Reps went up last session, or only one session has been done at this weight so far, so there is nothing to compare against yet." },
   { code: "new", label: "Never logged", tone: C.muted,
     note: "No sets recorded against these, so there is nothing to judge yet." },
 ];
 
 function renderHealth() {
   const rows = PROGRAMME.map((e) => {
-    const last = state.log.filter((l) => l.exId === e.id && l.type === "set").sort((a, b) => b.ts - a.ts)[0] || null;
+    const last = liftSets(e.id).sort((a, b) => b.ts - a.ts)[0] || null;
     const load = state.loads[e.id];
     /* Only suggest where the last session was run at the load the lift is
        currently sitting on. If you have already moved it, the suggestion
@@ -2786,7 +2905,18 @@ function stepBy(id, dir, min, max) {
 }
 window.stepBy = stepBy;
 
-function onLoadInput(v) { draft.load = v; }
+function onLoadInput(v) {
+  draft.load = v;
+  const ex = BY_ID[view.exId];
+  const n = ex.unit === "bw" ? 0 : parseFloat(v);
+  const el = document.getElementById("loadPill");
+  if (el) el.innerHTML = loadPill(ex, n);
+  const intro = document.getElementById("repsIntro");
+  if (intro) intro.outerHTML = repsIntro(ex, liftSets(ex.id).sort((a, b) => b.ts - a.ts), n);
+}
+
+function toggleHistory() { historyOpen = !historyOpen; render(); }
+window.toggleHistory = toggleHistory;
 window.onLoadInput = onLoadInput;
 
 function bumpLoad(dir) {
@@ -2818,8 +2948,8 @@ window.useSuggested = useSuggested;
 
 function resetReps() {
   const ex = BY_ID[view.exId];
-  const target = state.loads[ex.id];
-  const src = state.log.filter((l) => l.exId === ex.id && l.type === "set" && l.load === target).sort((a, b) => b.ts - a.ts)[0];
+  const v = ex.unit === "bw" ? 0 : parseFloat(draft.load);
+  const src = liftSets(ex.id).filter((l) => l.load === v).sort((a, b) => b.ts - a.ts)[0];
   if (src) draft.reps = draft.reps.map((d, i) => (src.reps[i] !== undefined ? src.reps[i] : d));
   render();
 }
@@ -2846,8 +2976,8 @@ function saveSet() {
   };
 
   persist({
-    loads: Object.assign({}, state.loads, { [ex.id]: effLoad }),
-    peaks: Object.assign({}, state.peaks, { [ex.id]: peak == null ? effLoad : Math.max(peak, effLoad) }),
+    loads: withTwin(state.loads, ex.id, effLoad),
+    peaks: withTwin(state.peaks, ex.id, peak == null ? effLoad : Math.max(peak, effLoad)),
     log: state.log.concat([entry]),
   });
 
@@ -2869,7 +2999,7 @@ function deload() {
   const nl = roundToInc(target * (1 - DELOAD_PCT), ex.inc || 1);
   if (!confirm("Deload " + ex.name + " by 30%, from " + fmtLoad(ex, target) + " to " + fmtLoad(ex, nl) + "?")) return;
   persist({
-    loads: Object.assign({}, state.loads, { [ex.id]: nl }),
+    loads: withTwin(state.loads, ex.id, nl),
     log: state.log.concat([{ type: "deload", exId: ex.id, date: today(), ts: Date.now(), load: nl, reps: [], synced: false }]),
   });
   draft.load = String(nl);
@@ -3568,6 +3698,16 @@ function whoopStats(days) {
   out.recOnTraining = mean(on);
   out.recOnRest = mean(off);
   out.onN = on.length; out.offN = off.length;
+  /* The morning AFTER, a different question. Recovery is scored on waking,
+     before any session, so the same-day pair above only says whether you
+     choose good days to train. What a session costs shows up the next
+     morning, so each recovery is also filed by whether the day before it
+     had a gym session. */
+  const after = rec.filter((r) => trained.has(addDays(r.date, -1))).map((r) => r.recovery);
+  const afterRest = rec.filter((r) => !trained.has(addDays(r.date, -1))).map((r) => r.recovery);
+  out.recAfterTraining = mean(after);
+  out.recAfterRest = mean(afterRest);
+  out.afterN = after.length; out.afterRestN = afterRest.length;
   return out;
 }
 
@@ -4635,18 +4775,37 @@ function whoopContent() {
       }).join("") + "</div>" +
       '<div class="hint">Last 7 days where there is data, otherwise the last 28. ' + s28.n + " day(s) logged in the last 28.</div></div>";
 
-    if (s28.recOnTraining != null && s28.recOnRest != null) {
-      const d = s28.recOnTraining - s28.recOnRest;
-      out += '<div class="panel"><div class="panel-label">Recovery against training</div>' +
-        '<div class="kv">' +
-        '<div><div class="k">Gym days</div><div class="v">' + Math.round(s28.recOnTraining) + '<span style="font-size:12px;color:var(--muted)">%</span></div></div>' +
-        '<div><div class="k">Rest days</div><div class="v">' + Math.round(s28.recOnRest) + '<span style="font-size:12px;color:var(--muted)">%</span></div></div>' +
-        "</div>" +
-        '<div class="hint">' + s28.onN + " gym days against " + s28.offN + " rest days, last 28. " +
-        (Math.abs(d) < 4 ? "No real difference yet."
-          : d > 0 ? "You train on your better days, which is sensible and also means the programme is not what is draining you."
-            : "You are training on your worse days. Worth a look if lifts are stalling in clusters.") +
-        " Correlation needs a few weeks of both before it says much.</div></div>";
+    const pct = (v) => Math.round(v) + '<span style="font-size:12px;color:var(--muted)">%</span>';
+    const hasOf = s28.recOnTraining != null && s28.recOnRest != null;
+    const hasAfter = s28.recAfterTraining != null && s28.recAfterRest != null;
+    if (hasOf || hasAfter) {
+      let body = "";
+      if (hasOf) {
+        const d = s28.recOnTraining - s28.recOnRest;
+        body += '<div class="lbl" style="margin-bottom:6px">Morning of: do you pick good days to train?</div>' +
+          '<div class="kv">' +
+          '<div><div class="k">Gym days</div><div class="v">' + pct(s28.recOnTraining) + "</div></div>" +
+          '<div><div class="k">Rest days</div><div class="v">' + pct(s28.recOnRest) + "</div></div>" +
+          "</div>" +
+          '<div class="hint" style="margin-bottom:14px">' + s28.onN + " gym mornings against " + s28.offN + " rest mornings. " +
+          (Math.abs(d) < 4 ? "No real difference yet."
+            : d > 0 ? "You train on your better days, which is sensible."
+              : "You are training on your worse days. Worth a look if lifts are stalling in clusters.") + "</div>";
+      }
+      if (hasAfter) {
+        const d = s28.recAfterTraining - s28.recAfterRest;
+        body += '<div class="lbl" style="margin-bottom:6px">Morning after: what does a session cost you?</div>' +
+          '<div class="kv">' +
+          '<div><div class="k">After gym</div><div class="v">' + pct(s28.recAfterTraining) + "</div></div>" +
+          '<div><div class="k">After rest</div><div class="v">' + pct(s28.recAfterRest) + "</div></div>" +
+          "</div>" +
+          '<div class="hint">' + s28.afterN + " mornings after a gym day against " + s28.afterRestN + " after a day without one. " +
+          (Math.abs(d) < 4 ? "No real difference: a session is not costing you a recovery the next day."
+            : d < 0 ? "A session costs you about " + Math.round(-d) + " points the next morning."
+              : "Slightly better after gym days than after days without one. If that holds over more weeks, the likelier reason is something else loading the other days rather than lifting helping, and the panel below shows what each day held.") + "</div>";
+      }
+      out += '<div class="panel"><div class="panel-label">Recovery against training</div>' + body +
+        '<div class="hint" style="margin-top:10px">Last 28 days. \u201cRest\u201d means no gym session, not no activity. Both pairs need a few weeks of each before the difference means much.</div></div>';
     }
 
     const recPts = whoopSorted().filter((r) => r.recovery != null).map((r) => ({ x: r.date, y: r.recovery }));
