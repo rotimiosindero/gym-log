@@ -803,7 +803,7 @@ const BASE_PROGRAMME = [
   // ---- Lower A
   { id: "la1", s: "lowerA", name: "Leg press", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 10 },
   { id: "la2", s: "lowerA", name: "Trap bar deadlift", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
-  { id: "la3", s: "lowerA", name: "Leg extension", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
+  { id: "la3", s: "lowerA", name: "Leg extension", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5, plus: true },
   { id: "la4", s: "lowerA", name: "Laying hamstring curl", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5.5 },
   { id: "la5", s: "lowerA", name: "Calf raises", unit: "kg", sets: 3, lo: 12, hi: 15, inc: 5 },
   { id: "la6", s: "lowerA", name: "Adductor (in)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 1 },
@@ -814,7 +814,7 @@ const BASE_PROGRAMME = [
   { id: "ua3", s: "upperA", name: "Bent-over row, overhand BB (form)", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "ua4", s: "upperA", name: "Overhead DB", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "ua5", s: "upperA", name: "Cable fly, upper chest", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
-  { id: "ua6", s: "upperA", name: "Bar pull-down, close grip", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 1 },
+  { id: "ua6", s: "upperA", name: "Bar pull-down, close grip", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ua7", s: "upperA", name: "Shoulder lat raise (wrist variation)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ua8", s: "upperA", name: "Tri, palm down", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 1 },
   { id: "ua9", s: "upperA", name: "Bi, preacher", unit: "kg", sets: 3, lo: 6, hi: 8, inc: 2.5 },
@@ -840,7 +840,7 @@ const BASE_PROGRAMME = [
   { id: "ub6", s: "upperB", name: "Face pull (ball grip)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ub7", s: "upperB", name: "Pec dec", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 4 },
   { id: "ub8", s: "upperB", name: "Fly", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
-  { id: "ub9", s: "upperB", name: "Bar pull-down, wide grip", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 1 },
+  { id: "ub9", s: "upperB", name: "Bar pull-down, wide grip", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ub10", s: "upperB", name: "Rear delt fly (single arm cable)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ub11", s: "upperB", name: "Bi, rope curl", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 1 },
   { id: "ub12", s: "upperB", name: "Tri, weighted dips", unit: "kg", sets: 3, lo: 6, hi: 8, inc: 2.5 },
@@ -1271,7 +1271,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.9 \u00b7 today first";
+const VERSION = "2.9.1 \u00b7 half steps";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1283,12 +1283,23 @@ const C = {
 ------------------------------------------------------------------*/
 const fmtPin = (n) => (n % 1 === 0.5 ? Math.floor(n) + "+" : String(n));
 
+/* A kilo lift marked plus: true has a half plate that sits between its
+   real steps. Its inc is the half (2.5 on a 5kg machine) so stepping and
+   every sum work in true kilos, and only the writing changes: 52.5 is
+   shown as "50+", meaning the 50 step plus the half plate. */
+function fmtKg(ex, n) {
+  const k = ex && ex.plus && ex.inc ? n / ex.inc : NaN;
+  if (Math.abs(k - Math.round(k)) < 1e-9 && Math.round(k) % 2 === 1) return Number((n - ex.inc).toFixed(2)) + "+";
+  return String(Number(n.toFixed(2)));
+}
+
 function fmtLoad(ex, n) {
   if (!ex) return String(n);
   if (ex.unit === "bw") return "Bodyweight";
   if (n == null) return "not set";
   if (ex.unit === "pin") return '"' + fmtPin(n) + '"';
-  return Number(n.toFixed(2)) + "kg";
+  const t = fmtKg(ex, n);
+  return t.slice(-1) === "+" ? t.slice(0, -1) + "kg+" : t + "kg";
 }
 
 function roundToInc(v, inc) {
@@ -1523,7 +1534,7 @@ function suggestLoad(ex, reps, rir, load) {
      load, as it is on a light dumbbell, the move overshoots the estimate
      instead, and calling that capped would have it apologising for being
      generous. */
-  let units, wantUnits;
+  let units, wantUnits, rawKg, heldKg;
   if (flat) {
     units = wantUnits = dir * inc;
   } else {
@@ -1535,17 +1546,38 @@ function suggestLoad(ex, reps, rir, load) {
     const toUnits = (d) => (ex.unit === "pin" ? kgToPin(ex, kg + d) - load : d);
     units = toUnits(held);
     wantUnits = toUnits(raw);
+    rawKg = raw; heldKg = held;
   }
 
   let steps = Math.round(Math.abs(units) / inc);
   if (steps > SUGGEST_STEPS) steps = SUGGEST_STEPS;
   if (steps < 1) steps = 1;
+
+  /* A pin lift that moves in half steps is not moving in equal steps: the
+     half is the add-on plate, which is far lighter than a whole pin, so
+     13 to 13+ is a small move and 13+ to 14 a big one. Counting them as
+     equal would aim at the wrong pin. So on a measured stack, try each
+     reachable step for real and take the one whose kilos land nearest. */
+  let capped = Math.abs(wantUnits) / inc > steps + 0.5;
+  if (ex.unit === "pin" && !flat && inc % 1 !== 0) {
+    const nearest = (goal, most) => {
+      let best = 1, gap = Infinity;
+      for (let k = 1; k <= most; k++) {
+        const v = pinToKg(ex, load + dir * k * inc);
+        if (v == null || load + dir * k * inc <= 0) break;
+        if (Math.abs(v - goal) < gap) { gap = Math.abs(v - goal); best = k; }
+      }
+      return best;
+    };
+    steps = nearest(kg + heldKg, SUGGEST_STEPS);
+    capped = nearest(kg + rawKg, 20) > steps;
+  }
   const next = Number((load + dir * steps * inc).toFixed(2));
   if (next <= 0) return null;
 
   return { dir: dir, load: next, steps: steps, from: load, best: best,
            rir: rir, flat: flat, uncal: kg == null,
-           capped: Math.abs(wantUnits) / inc > steps + 0.5 };
+           capped: capped };
 }
 
 /** The suggestion in words. Lives next to the maths so the two cannot drift. */
@@ -1556,7 +1588,7 @@ function suggestWhy(ex, sg) {
       " should bring the range back. If that was one bad day rather than too much weight, ignore this and run " + from + " again.";
   }
   if (sg.uncal) {
-    return "Every set at the top of the range, so one pin up. Measure this stack on Setup and the size of the step can be worked out from your reps instead of assumed.";
+    return "Every set at the top of the range, so one step up. Measure this stack on Setup and the size of the step can be worked out from your reps instead of assumed.";
   }
   if (sg.flat) {
     return "Every set at " + ex.hi + ", and this lift has a single rep target rather than a range, so it moves one step to " + to + ".";
@@ -2389,7 +2421,7 @@ function renderExercise() {
     '<div class="panel-label" style="margin-bottom:8px">Target today</div>' +
     '<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">' +
     '<div style="font-size:52px;font-weight:700;line-height:1;color:var(--accent);letter-spacing:-1.5px">' +
-    (ex.unit === "bw" ? "BW" : target == null ? "\u2013\u2013" : ex.unit === "pin" ? '"' + fmtPin(target) + '"' : Number(target.toFixed(2))) +
+    (ex.unit === "bw" ? "BW" : target == null ? "\u2013\u2013" : ex.unit === "pin" ? '"' + fmtPin(target) + '"' : fmtKg(ex, target)) +
     "</div>" +
     '<div style="font-size:16px;color:var(--muted);padding-bottom:6px">' +
     (ex.unit === "kg" ? "kg" : ex.unit === "pin" ? "pin" : "") + " \u00b7 " + ex.sets + " \u00d7 " + ex.lo + "\u2013" + ex.hi + (ex.repUnit === "sec" ? " sec" : "") +
@@ -2410,7 +2442,7 @@ function renderExercise() {
     h += '<div class="suggest' + (sgNext.dir < 0 ? " down" : "") + '">' +
       '<div class="panel-label">' + (sgNext.dir < 0 ? "Today: come down" : "Today: move up") + "</div>" +
       '<div class="suggest-row">' +
-      '<div class="suggest-val">' + esc(ex.unit === "pin" ? '"' + fmtPin(sgNext.load) + '"' : String(sgNext.load)) +
+      '<div class="suggest-val">' + esc(ex.unit === "pin" ? '"' + fmtPin(sgNext.load) + '"' : fmtKg(ex, sgNext.load)) +
       "<span>" + (ex.unit === "pin" ? " pin" : "kg") + "</span></div>" +
       '<button class="btn-mini solid" onclick="useSuggested(' + sgNext.load + ')">Use it</button>' +
       '<span class="suggest-step">' + (sgNext.dir > 0 ? "+" : "\u2212") + esc(fmtLoad(ex, sgNext.steps * (ex.inc || 1))) + "</span>" +
@@ -2429,7 +2461,8 @@ function renderExercise() {
     '<div class="hint" id="loadHint">' +
     (ex.unit === "pin" ? "Cable pin position. Use .5 for a half step, shown as \u201c+\u201d."
       : ex.unit === "bw" ? "Bodyweight movement."
-        : "Steps of " + ex.inc + "kg.") +
+        : ex.plus ? "Steps of " + ex.inc * 2 + "kg, with + for the " + ex.inc + "kg half plate between them. Type " + (ex.inc * 2 * 10 + ex.inc) + " for " + ex.inc * 2 * 10 + "+."
+          : "Steps of " + ex.inc + "kg.") +
     (isPB && peak != null ? ' <span style="color:var(--pb);font-weight:600">Above your peak of ' + esc(fmtLoad(ex, peak)) + ".</span>" : "") +
     "</div></div>";
 
