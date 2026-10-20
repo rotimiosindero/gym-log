@@ -609,6 +609,11 @@
   .suggest.down .suggest-val { color: var(--warn); }
   .suggest-val span { font-size: 14px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
   .suggest-step { font-size: 13px; color: var(--muted); }
+  .drop-row { margin: 0 0 12px 62px; padding: 8px 10px; border-left: 2px solid var(--warn); background: var(--panel-2, transparent); border-radius: 0 8px 8px 0; }
+  .drop-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .drop-line + .drop-line { margin-top: 8px; }
+  .drop-tag { font-size: 12px; color: var(--warn); margin-right: 2px; }
+  .drop-val { font-size: 13px; font-weight: 600; min-width: 44px; text-align: center; color: var(--text); }
   .suggest-why { font-size: 12.5px; color: var(--muted); line-height: 1.55; margin-top: 11px; }
 
   /* A panel heading that is itself the way in to a fuller page. */
@@ -809,6 +814,11 @@ const BASE_PROGRAMME = [
   { id: "la6", s: "lowerA", name: "Adductor (in)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 1 },
 
   // ---- Upper A
+  // Rotator cuff, first thing on both upper days, on the cable fly's stack
+  // on both days. See PIN_FROM.
+  { id: "ua13", s: "upperA", name: "Internal Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
+  { id: "ua14", s: "upperA", name: "External Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
+  { id: "ua15", s: "upperA", name: "90 degree Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
   { id: "ua1", s: "upperA", name: "Machine press (mid)", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "ua2", s: "upperA", name: "Bent-over row, underhand BB", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "ua3", s: "upperA", name: "Bent-over row, overhand BB (form)", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
@@ -832,13 +842,16 @@ const BASE_PROGRAMME = [
   { id: "lb7", s: "lowerB", name: "Abductor (out)", unit: "pin", sets: 4, lo: 8, hi: 10, inc: 1 },
 
   // ---- Upper B
+  { id: "ub15", s: "upperB", name: "Internal Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
+  { id: "ub16", s: "upperB", name: "External Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
+  { id: "ub17", s: "upperB", name: "90 degree Rotation, Cable", unit: "pin", sets: 3, lo: 10, hi: 15, inc: 0.5, lead: true },
   { id: "ub1", s: "upperB", name: "DB incline", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "ub2", s: "upperB", name: "Cable row", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 1 },
   { id: "ub3", s: "upperB", name: "Cable row, wide", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 1 },
   { id: "ub4", s: "upperB", name: "Cable row, single", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 0.5, opt: true },
   { id: "ub5", s: "upperB", name: "Shoulder rope pull through", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ub6", s: "upperB", name: "Face pull (ball grip)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
-  { id: "ub7", s: "upperB", name: "Pec dec", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 4 },
+  { id: "ub7", s: "upperB", name: "Pec dec", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2, plus: true },
   { id: "ub8", s: "upperB", name: "Fly", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 5 },
   { id: "ub9", s: "upperB", name: "Bar pull-down, wide grip", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
   { id: "ub10", s: "upperB", name: "Rear delt fly (single arm cable)", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 0.5 },
@@ -849,16 +862,16 @@ const BASE_PROGRAMME = [
 
   // ---- Grip, neck & abs
   { id: "g1", s: "grip", name: "Cable crunch", unit: "pin", sets: 4, lo: 6, hi: 8, inc: 1 },
-  { id: "g2", s: "grip", name: "DB palm down", unit: "kg", sets: 3, lo: 6, hi: 8, inc: 2.5 },
-  { id: "g3", s: "grip", name: "DB palm up", unit: "kg", sets: 3, lo: 6, hi: 8, inc: 2.5 },
-  { id: "g4", s: "grip", name: "Plate (thumb up) extension", unit: "kg", sets: 3, lo: 10, hi: 12, inc: 1.25 },
+  { id: "g2", s: "grip", name: "DB palm down", unit: "kg", sets: 3, lo: 10, hi: 15, inc: 2.5 },
+  { id: "g3", s: "grip", name: "DB palm up", unit: "kg", sets: 3, lo: 10, hi: 15, inc: 2.5 },
+  { id: "g4", s: "grip", name: "Plate (thumb up) extension", unit: "kg", sets: 3, lo: 10, hi: 15, inc: 5 },
   { id: "g5", s: "grip", name: "Internal rotation", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 0.5 },
   { id: "g6", s: "grip", name: "Shrugs, DB", unit: "kg", sets: 4, lo: 6, hi: 8, inc: 2.5 },
   { id: "g7", s: "grip", name: "Plate grip", unit: "kg", sets: 4, lo: 45, hi: 45, inc: 2.5, repUnit: "sec" },
   { id: "g8", s: "grip", name: "Hanging leg raises", unit: "bw", sets: 3, lo: 8, hi: 10, inc: 0 },
   { id: "g9", s: "grip", name: "Side crunch, cable", unit: "pin", sets: 3, lo: 6, hi: 8, inc: 1 },
-  { id: "g10", s: "grip", name: "Neck extension", unit: "kg", sets: 3, lo: 8, hi: 10, inc: 2.5 },
-  { id: "g11", s: "grip", name: "Neck contraction", unit: "kg", sets: 3, lo: 8, hi: 10, inc: 2.5 },
+  { id: "g10", s: "grip", name: "Neck extension", unit: "kg", sets: 3, lo: 10, hi: 15, inc: 2.5 },
+  { id: "g11", s: "grip", name: "Neck contraction", unit: "kg", sets: 3, lo: 10, hi: 15, inc: 2.5 },
 ];
 
 /* PROGRAMME and BY_ID are reassigned once state loads, by rebuildProgramme()
@@ -902,13 +915,14 @@ const MG_MAP = {
   // Upper A
   ua1: "chest", ua2: "back", ua3: "back", ua4: "shoulders", ua5: "chest",
   ua6: "back", ua7: "shoulders", ua8: "arms", ua9: "arms", ua10: "arms",
-  ua11: "back", ua12: "back",
+  ua11: "back", ua12: "back", ua13: "shoulders", ua14: "shoulders", ua15: "shoulders",
   // Lower B
   lb1: "legs", lb2: "legs", lb3: "legs", lb4: "legs", lb5: "legs", lb6: "legs", lb7: "legs",
   // Upper B
   ub1: "chest", ub2: "back", ub3: "back", ub4: "back", ub5: "shoulders",
   ub6: "shoulders", ub7: "chest", ub8: "chest", ub9: "back", ub10: "shoulders",
   ub11: "arms", ub12: "arms", ub13: "arms", ub14: "back",
+  ub15: "shoulders", ub16: "shoulders", ub17: "shoulders",
   // Grip, neck & abs
   g1: "core", g2: "grip", g3: "grip", g4: "grip", g5: "grip", g6: "back",
   g7: "grip", g8: "core", g9: "core", g10: "neck", g11: "neck",
@@ -1032,11 +1046,68 @@ BASE_PROGRAMME.forEach(tagExercise);
    the history that progress is judged from, and logging either one moves
    both. Each session still records its entries under its own name, so the
    log and the Obsidian export are unchanged. */
-const TWIN = { la5: "lb6", lb6: "la5" };
+const TWIN = {
+  la5: "lb6", lb6: "la5",
+  ua13: "ub15", ub15: "ua13", ua14: "ub16", ub16: "ua14", ua15: "ub17", ub17: "ua15",
+};
+
+/* Cable lifts that share another lift's stack, so one measurement serves
+   both and the two can never drift apart. The shared one is read first. */
+const PIN_FROM = { ua13: "ua5", ua14: "ua5", ua15: "ua5", ub15: "ua5", ub16: "ua5", ub17: "ua5" };
+
+/** The stack measurements a pin lift converts with, or null. */
+function pinCal(ex) {
+  const all = state.settings.pins || {};
+  const ok = (c) => c && c.p1 != null && c.step > 0;
+  const src = PIN_FROM[ex.id];
+  if (src && ok(all[src])) return all[src];
+  return ok(all[ex.id]) ? all[ex.id] : null;
+}
+
+/* Lifts the programme has taken out of a session. Each is benched once on
+   the device rather than deleted, so its history keeps its own session
+   and it can be restored from Edit exercises. Internal rotation left grip
+   day on 20 Oct 2026, replaced by the rotator cuff block on both upper
+   days, which starts fresh because the rep range and stack changed. */
+const MOVED_OUT = ["g5"];
 
 /** Every set entry for this lift, its twin's included. */
 const liftSets = (exId, log) =>
   (log || state.log).filter((l) => l.type === "set" && (l.exId === exId || l.exId === TWIN[exId]));
+
+/* ----------------------------------------------------------------
+   Drop sets. When a set cannot be finished at the working weight, the
+   rest of it is done lighter. An entry keeps its reps at the working
+   weight exactly as before, so every rep comparison, the next-weight
+   suggestion and the one-rep-max estimate still read only those. The
+   lighter part rides alongside in `drops`, one slot per set, null where
+   the set was not dropped: { load, reps }. A set done entirely at the
+   lighter weight is reps 0 plus a drop.
+------------------------------------------------------------------*/
+const hasDrop = (l) => !!(l && l.drops && l.drops.some(Boolean));
+
+/** A load in kilos where the stack is measured, otherwise the raw pin
+ *  number. Only ever compared within one lift, where either works. */
+function loadKg(ex, v) {
+  if (ex && ex.unit === "pin") { const k = pinToKg(ex, v); return k == null ? v : k; }
+  return v;
+}
+
+/** Everything moved in one entry, the dropped part included. */
+function entryWork(ex, l) {
+  let w = loadKg(ex, l.load) * sum(l.reps);
+  (l.drops || []).forEach((d) => { if (d) w += loadKg(ex, d.load) * d.reps; });
+  return w;
+}
+
+/** Reps as written in the log and in Obsidian: 8,6+2@30kg,8@30kg. */
+function fmtReps(ex, l, sep) {
+  return l.reps.map((r, i) => {
+    const d = l.drops && l.drops[i];
+    if (!d) return String(r);
+    return (r > 0 ? r + "+" : "") + d.reps + "@" + fmtLoad(ex, d.load);
+  }).join(sep == null ? "," : sep);
+}
 
 /** Writes one value for a lift and, if it has one, its twin. */
 const withTwin = (map, exId, v) =>
@@ -1271,7 +1342,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.9.1 \u00b7 half steps";
+const VERSION = "2.10 \u00b7 drop sets, rotator cuff";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1349,12 +1420,20 @@ function statusFor(exId, log) {
 
   let streak = 0;
   let declines = 0;
+  /* A dropped session counts as progress only when it moved more in total
+     than the session before, lighter reps included. Otherwise it is a flat
+     session rather than a decline: the set was still finished, just not at
+     the working weight. Getting further into the set before the drop shows
+     up as more reps at the working weight, which is ordinary progress. */
+  const ex = BY_ID[exId];
   for (let i = run.length - 1; i > 0; i--) {
     const now = sum(run[i].reps);
     const prev = sum(run[i - 1].reps);
     if (now > prev) break;
+    const dropped = hasDrop(run[i]);
+    if (dropped && ex && entryWork(ex, run[i]) > entryWork(ex, run[i - 1])) break;
     streak++;
-    if (now < prev) declines++;
+    if (now < prev && !dropped) declines++;
     else declines = 0;
   }
 
@@ -1446,15 +1525,15 @@ function statusAdvice(ex, st, target) {
 /** The line at the top of the reps panel, for the weight in the box. */
 function repsIntro(ex, sets, v) {
   const p = (t) => '<div class="body-copy" id="repsIntro" style="margin-bottom:14px">' + t + "</div>";
-  const nums = (r) => '<span style="color:var(--text);font-weight:600">' + esc(r.join(", ")) + "</span>";
+  const nums = (l) => '<span style="color:var(--text);font-weight:600">' + esc(fmtReps(ex, l, ", ")) + "</span>";
   const at = isNaN(v) ? null : sets.find((l) => l.load === v);
   if (at) {
-    return p("Today: beat " + nums(at.reps) + (ex.unit === "bw" ? "" : " at " + esc(fmtLoad(ex, v))) +
+    return p("Today: beat " + nums(at) + (ex.unit === "bw" ? "" : " at " + esc(fmtLoad(ex, v))) +
       ". One more " + (ex.repUnit === "sec" ? "second" : "rep") + " on any set counts.");
   }
   if (sets.length) {
     return p("First session at " + esc(isNaN(v) ? "this weight" : fmtLoad(ex, v)) + ". Last time, " + esc(fmtLoad(ex, sets[0].load)) +
-      " for " + nums(sets[0].reps) + ". Aim for at least " + ex.lo + " on every set.");
+      " for " + nums(sets[0]) + ". Aim for at least " + ex.lo + " on every set.");
   }
   return p("No history yet. Start at the bottom of the range.");
 }
@@ -1499,8 +1578,8 @@ const SUGGEST_DOWN = 0.15;   // most to take off; coming down is the safe direct
  *  Add-on plates are left out of the return trip on purpose: suggesting
  *  "13+" would be a precision this estimate does not have. */
 function kgToPin(ex, kg) {
-  const c = (state.settings.pins || {})[ex.id];
-  if (!c || c.p1 == null || !(c.step > 0)) return null;
+  const c = pinCal(ex);
+  if (!c) return null;
   const stack = c.half ? kg * 2 : kg;
   return (stack - c.p1) / c.step + 1;
 }
@@ -1623,7 +1702,9 @@ function buildExport(log) {
   });
 
   const nameWidth = Math.min(36, Math.max.apply(null, sets.map((l) => (BY_ID[l.exId] ? BY_ID[l.exId].name.length : 0))));
-  const pad = (s, n) => (s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length));
+  // Pads for alignment but never trims: a cut-off reps column would lose a
+  // drop set from the only durable record of it.
+  const pad = (s, n) => (s.length >= n ? s : s + " ".repeat(n - s.length));
 
   const out = [];
   Object.keys(byDate).sort().forEach((date) => {
@@ -1641,7 +1722,7 @@ function buildExport(log) {
         const flags = l.flags && l.flags.length ? l.flags.join(" ") : "-";
         out.push(
           (date + " | " + pad(ex.name, nameWidth) + " | " + pad(fmtLoad(ex, l.load), 8) + " | " +
-            pad(l.reps.join(","), 12) + " | " + (l.rir != null ? l.rir : "-") + " | " + pad(flags, 4) + " | " + (l.note || "")
+            pad(fmtReps(ex, l), 12) + " | " + (l.rir != null ? l.rir : "-") + " | " + pad(flags, 4) + " | " + (l.note || "")
           ).replace(/\s+$/, "")
         );
       });
@@ -1739,6 +1820,14 @@ function load() {
     plan: Object.assign({ off: {}, order: {}, custom: [] }, (saved && saved.plan) || {}),
     settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null, theme: "system", whoopUrl: "", whoopKey: "", whoopLastFetch: null, whoopError: null }, (saved && saved.settings) || {}),
   };
+
+  const moved = Object.assign({}, state.plan.moved || {});
+  MOVED_OUT.forEach((id) => {
+    if (moved[id]) return;
+    moved[id] = today();
+    state.plan.off = Object.assign({}, state.plan.off, { [id]: (state.plan.off || {})[id] || today() });
+  });
+  state.plan.moved = moved;
 
   /* Bring twinned lifts into step, which matters once: before the twin
      existed they were logged separately and can disagree. The weight comes
@@ -2005,8 +2094,10 @@ function sessionExercises(sid, opts) {
   const ranked = order
     ? all.slice().sort((a, b) => {
         const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
-        const ra = ia === -1 ? 1e9 + all.indexOf(a) : ia;
-        const rb = ib === -1 ? 1e9 + all.indexOf(b) : ib;
+        // A lift added since the order was saved goes last, unless the
+        // programme marks it as leading the session.
+        const ra = ia === -1 ? (a.lead ? -1e9 : 1e9) + all.indexOf(a) : ia;
+        const rb = ib === -1 ? (b.lead ? -1e9 : 1e9) + all.indexOf(b) : ib;
         return ra - rb;
       })
     : all;
@@ -2050,7 +2141,7 @@ function renderSessions() {
       const ex = BY_ID[l.exId];
       h += '<div class="list-row"><span>' + esc(ex ? ex.name : l.exId) + "</span>" +
         '<span style="color:var(--muted)">' + esc(l.date) + " · " +
-        (l.type === "deload" ? "Deload" : esc(fmtLoad(ex, l.load) + " · " + l.reps.join(","))) +
+        (l.type === "deload" ? "Deload" : esc(fmtLoad(ex, l.load) + " · " + fmtReps(ex, l))) +
         (l.synced ? "" : ' <span style="color:var(--accent)">●</span>') +
         "</span></div>";
     });
@@ -2108,7 +2199,7 @@ function renderSession() {
     const sg = lastAt ? suggestLoad(e, lastAt.reps, lastAt.rir, lastAt.load) : null;
     const plan = sg
       ? '<span style="font-size:12px;font-weight:600;color:' + (sg.dir > 0 ? C.pb : C.warn) + '">Today: ' + esc(fmtLoad(e, sg.load)) + "</span>"
-      : lastAt ? '<span style="font-size:12px;color:var(--text)">Beat ' + esc(lastAt.reps.join(", ")) + "</span>" : "";
+      : lastAt ? '<span style="font-size:12px;color:var(--text)">Beat ' + esc(fmtReps(e, lastAt, ", ")) + "</span>" : "";
     h += '<button class="card tight' + (alarm ? " alarm" : "") + '" onclick="go({page:\'exercise\',exId:\'' + e.id + '\'})">' +
       '<div class="row baseline">' +
       '<div class="name sm">' + esc(e.name) + (e.opt ? ' <span class="opt">(if time)</span>' : "") + "</div>" +
@@ -2401,7 +2492,7 @@ function renderExercise() {
       if (!src) return d;
       return src.reps[i] !== undefined ? src.reps[i] : (src.reps[src.reps.length - 1] !== undefined ? src.reps[src.reps.length - 1] : d);
     });
-    draft = { reps: reps, rir: lastSet && lastSet.rir != null ? lastSet.rir : 1, load: target == null ? "" : String(target), formReset: false, note: "" };
+    draft = { reps: reps, drops: [], rir: lastSet && lastSet.rir != null ? lastSet.rir : 1, load: target == null ? "" : String(target), formReset: false, note: "" };
   }
 
   const history = state.log.filter((l) => l.exId === ex.id || l.exId === TWIN[ex.id]).sort((a, b) => b.ts - a.ts).slice(0, 6);
@@ -2461,7 +2552,7 @@ function renderExercise() {
     '<div class="hint" id="loadHint">' +
     (ex.unit === "pin" ? "Cable pin position. Use .5 for a half step, shown as \u201c+\u201d."
       : ex.unit === "bw" ? "Bodyweight movement."
-        : ex.plus ? "Steps of " + ex.inc * 2 + "kg, with + for the " + ex.inc + "kg half plate between them. Type " + (ex.inc * 2 * 10 + ex.inc) + " for " + ex.inc * 2 * 10 + "+."
+        : ex.plus ? "Steps of " + ex.inc * 2 + "kg, with + for the " + ex.inc + "kg half step between them. Type " + (ex.inc * 2 * 10 + ex.inc) + " for " + ex.inc * 2 * 10 + "+."
           : "Steps of " + ex.inc + "kg.") +
     (isPB && peak != null ? ' <span style="color:var(--pb);font-weight:600">Above your peak of ' + esc(fmtLoad(ex, peak)) + ".</span>" : "") +
     "</div></div>";
@@ -2477,11 +2568,33 @@ function renderExercise() {
     const label = delta === null
       ? (r >= ex.hi ? "top" : r >= ex.lo ? "in range" : "under")
       : delta === 0 ? "= " + prev : (delta > 0 ? "+" : "") + delta;
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-      '<span style="font-size:14px;color:var(--muted);width:62px">Set ' + (i + 1) + "</span>" +
+    const canDrop = ex.unit !== "bw" && valid;
+    const d = draft.drops[i];
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (d ? 4 : 8) + 'px">' +
+      '<span style="font-size:14px;color:var(--muted);width:62px">Set ' + (i + 1) +
+      (canDrop && !d ? '<br><button class="btn-mini" style="margin-top:4px;padding:3px 8px;font-size:11px" onclick="toggleDrop(' + i + ')">Drop</button>' : "") +
+      "</span>" +
       stepper("rep" + i, r, 0, ex.repUnit === "sec" ? 180 : 60, true) +
       '<span id="delta' + i + '" style="width:62px;text-align:right;font-size:13px;color:' + tone + '">' + esc(label) + "</span>" +
       "</div>";
+    if (d) {
+      const unitLabel = ex.repUnit === "sec" ? "sec" : "reps";
+      h += '<div class="drop-row">' +
+        '<div class="drop-line"><span class="drop-tag">Dropped to</span>' +
+        '<button class="step-btn sm" aria-label="Lighter" onclick="dropBy(' + i + ',\'load\',-1)">\u2212</button>' +
+        '<span class="drop-val">' + esc(fmtLoad(ex, d.load)) + "</span>" +
+        '<button class="step-btn sm" aria-label="Heavier" onclick="dropBy(' + i + ',\'load\',1)">+</button>' +
+        '<button class="step-btn sm" aria-label="Fewer" onclick="dropBy(' + i + ',\'reps\',-1)">\u2212</button>' +
+        '<span class="drop-val">' + d.reps + " " + unitLabel + "</span>" +
+        '<button class="step-btn sm" aria-label="More" onclick="dropBy(' + i + ',\'reps\',1)">+</button>' +
+        "</div>" +
+        '<div class="drop-line">' +
+        (i < draft.reps.length - 1
+          ? '<button class="btn-mini" onclick="dropRest(' + i + ')">Rest of the sets at ' + esc(fmtLoad(ex, d.load)) + "</button>"
+          : "") +
+        '<button class="btn-mini" onclick="toggleDrop(' + i + ')">Remove drop</button>' +
+        "</div></div>";
+    }
   });
 
   h += '<div class="stack" style="margin-top:10px;gap:8px">' +
@@ -2532,7 +2645,7 @@ function renderExercise() {
       h += '<div class="list-row"><span style="color:var(--muted)">' + esc(l.date) + (other ? " \u00b7 " + esc(other.name) : "") + "</span><span>" +
         (l.type === "deload"
           ? '<span style="color:var(--warn)">Deload to ' + esc(fmtLoad(ex, l.load)) + "</span>"
-          : esc(fmtLoad(ex, l.load)) + " \u00b7 " + esc(l.reps.join(",")) +
+          : esc(fmtLoad(ex, l.load)) + " \u00b7 " + esc(fmtReps(ex, l)) +
             (l.flags && l.flags.length ? ' <span style="color:var(--accent)">' + esc(l.flags.join(" ")) + "</span>" : "")) +
         "</span></div>";
     });
@@ -2608,7 +2721,7 @@ function renderHealth() {
       const sess = SESSIONS.filter((x) => x.id === ex.s)[0];
       const when = r.last ? (daysBetween(r.last.date, today()) === 0 ? "today" : fmtDay(r.last.date)) : "never";
       const sub = r.last
-        ? sess.name + " \u00b7 " + when + " \u00b7 " + r.last.reps.join(", ") +
+        ? sess.name + " \u00b7 " + when + " \u00b7 " + fmtReps(ex, r.last, ", ") +
           (r.last.rir != null ? " at " + r.last.rir + " in reserve" : "")
         : sess.name + " \u00b7 nothing logged";
       h += '<button class="hrow" onclick="go({page:\'exercise\',exId:\'' + ex.id + '\'})">' +
@@ -2747,7 +2860,7 @@ function renderLog() {
     const ex = BY_ID[l.exId];
     h += '<div class="list-row"><span>' + esc(ex ? ex.name : l.exId) + (l.synced ? "" : ' <span style="color:var(--accent)">\u25cf</span>') + "</span>" +
       '<span style="color:var(--muted);text-align:right">' + esc(l.date) + " \u00b7 " +
-      (l.type === "deload" ? "Deload to " + esc(fmtLoad(ex, l.load)) : esc(fmtLoad(ex, l.load) + " \u00b7 " + l.reps.join(","))) +
+      (l.type === "deload" ? "Deload to " + esc(fmtLoad(ex, l.load)) : esc(fmtLoad(ex, l.load) + " \u00b7 " + fmtReps(ex, l))) +
       "</span></div>";
   });
 
@@ -2967,6 +3080,52 @@ window.bumpLoad = bumpLoad;
 function fillReps(n) { draft.reps = draft.reps.map(() => n); render(); }
 window.fillReps = fillReps;
 
+/** Start or remove a drop on one set. It starts about a quarter lighter,
+ *  for the reps still missing from the top of the range. */
+function toggleDrop(i) {
+  const ex = BY_ID[view.exId];
+  if (draft.drops[i]) {
+    // A set done wholly at the lighter weight goes back to the working
+    // weight with the reps it had, rather than to zero.
+    if (draft.reps[i] === 0) draft.reps[i] = draft.drops[i].reps;
+    draft.drops[i] = null;
+    render();
+    return;
+  }
+  const main = parseFloat(draft.load);
+  if (!(main > 0)) return;
+  const inc = ex.inc || 1;
+  const load = Math.min(Math.max(inc, roundToInc(main * 0.75, inc)), Math.max(inc, main - inc));
+  draft.drops[i] = { load: Number(load.toFixed(2)), reps: Math.max(1, ex.hi - draft.reps[i]) };
+  render();
+}
+window.toggleDrop = toggleDrop;
+
+function dropBy(i, field, dir) {
+  const ex = BY_ID[view.exId];
+  const d = draft.drops[i];
+  if (!d) return;
+  if (field === "load") d.load = Number(Math.max(ex.inc || 1, d.load + dir * (ex.inc || 1)).toFixed(2));
+  else d.reps = Math.max(1, d.reps + dir);
+  render();
+}
+window.dropBy = dropBy;
+
+/** Carry on at the lighter weight: every later set becomes a whole set at
+ *  it, keeping the reps that set was planned for. Each can still be edited
+ *  or have its drop removed, which puts it back at the working weight. */
+function dropRest(i) {
+  const d = draft.drops[i];
+  if (!d) return;
+  for (let j = i + 1; j < draft.reps.length; j++) {
+    const planned = draft.drops[j] ? draft.drops[j].reps : draft.reps[j];
+    draft.drops[j] = { load: d.load, reps: Math.max(1, planned) };
+    draft.reps[j] = 0;
+  }
+  render();
+}
+window.dropRest = dropRest;
+
 /** Take the suggestion. The reps go back to the bottom of the range with
  *  it, because that is what a new working load means: you are buying reps
  *  back to spend them again, not carrying last session's across. */
@@ -3005,6 +3164,7 @@ function saveSet() {
   const entry = {
     type: "set", exId: ex.id, date: today(), ts: Date.now(),
     load: effLoad, reps: draft.reps.slice(), rir: draft.rir,
+    ...(draft.drops.some(Boolean) ? { drops: draft.reps.map((_, i) => draft.drops[i] || null) } : {}),
     formReset: draft.formReset, note: draft.note.trim(), flags: flags, synced: false,
   };
 
@@ -3654,12 +3814,15 @@ function weekBuckets(n) {
     const ex = BY_ID[l.exId], w = weekStart(l.date);
     if (!ex || !b[w]) return;
     b[w].days[l.date] = 1;
-    if (ex.unit === "kg") {
-      b[w].vol += l.load * (ex.db && state.settings.dbPer !== "total" ? 2 : 1) * sum(l.reps);
-    } else if (ex.unit === "pin") {
-      const k = pinToKg(ex, l.load);
-      if (k != null) b[w].vol += k * sum(l.reps);
-    }
+    const parts = [{ load: l.load, reps: sum(l.reps) }].concat((l.drops || []).filter(Boolean));
+    parts.forEach((p) => {
+      if (ex.unit === "kg") {
+        b[w].vol += p.load * (ex.db && state.settings.dbPer !== "total" ? 2 : 1) * p.reps;
+      } else if (ex.unit === "pin") {
+        const k = pinToKg(ex, p.load);
+        if (k != null) b[w].vol += k * p.reps;
+      }
+    });
   });
   return keys.map((k) => ({ week: k, vol: b[k].vol, days: Object.keys(b[k].days).length }));
 }
@@ -5217,8 +5380,8 @@ function bwCard() {
 
 /** Kilos at a pin position, or null when that machine is not calibrated. */
 function pinToKg(ex, pin) {
-  const c = (state.settings.pins || {})[ex.id];
-  if (!c || c.p1 == null || !(c.step > 0)) return null;
+  const c = pinCal(ex);
+  if (!c) return null;
   /* The "+" in the log is an add-on plate resting on the pin, NOT a half
      step down the stack: "13+" is pin 13 plus the plate. Modelling it as
      pin 12.5 understated every one of those entries. */
@@ -5279,6 +5442,14 @@ function renderPins() {
     h += '<div class="panel"><div class="panel-label">' + esc(s.name) + "</div>";
     mine.forEach((e) => {
       const c = cal[e.id] || {};
+      if (PIN_FROM[e.id]) {
+        h += '<div style="padding:11px 0;border-bottom:1px solid var(--line)">' +
+          '<div class="row baseline" style="gap:10px">' +
+          '<div class="name sm" style="flex:1">' + esc(e.name) + "</div>" +
+          '<div style="font-size:13px;white-space:nowrap;color:' + (pinToKg(e, 1) == null ? "var(--muted)" : "var(--accent)") + '">' + esc(pinReadout(e)) + "</div></div>" +
+          '<div class="hint" style="margin:4px 0 0">Same stack as ' + esc(BY_ID[PIN_FROM[e.id]].name) + ", so it uses that one\u2019s measurements.</div></div>";
+        return;
+      }
       h += '<div style="padding:11px 0;border-bottom:1px solid var(--line)">' +
         '<div class="row baseline" style="margin-bottom:9px;gap:10px">' +
         '<div class="name sm" style="flex:1">' + esc(e.name) + "</div>" +
