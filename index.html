@@ -610,6 +610,8 @@
   .suggest-val span { font-size: 14px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
   .suggest-step { font-size: 13px; color: var(--muted); }
   .drop-row { margin: 0 0 12px 62px; padding: 8px 10px; border-left: 2px solid var(--warn); background: var(--panel-2, transparent); border-radius: 0 8px 8px 0; }
+  .drop-offer { display: flex; justify-content: flex-end; margin: -2px 0 10px; }
+  .drop-offer .btn-mini { padding: 3px 10px; font-size: 11.5px; }
   .drop-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .drop-line + .drop-line { margin-top: 8px; }
   .drop-tag { font-size: 12px; color: var(--warn); margin-right: 2px; }
@@ -915,14 +917,14 @@ const MG_MAP = {
   // Upper A
   ua1: "chest", ua2: "back", ua3: "back", ua4: "shoulders", ua5: "chest",
   ua6: "back", ua7: "shoulders", ua8: "arms", ua9: "arms", ua10: "arms",
-  ua11: "back", ua12: "back", ua13: "shoulders", ua14: "shoulders", ua15: "shoulders",
+  ua11: "back", ua12: "back", ua13: "cuff", ua14: "cuff", ua15: "cuff",
   // Lower B
   lb1: "legs", lb2: "legs", lb3: "legs", lb4: "legs", lb5: "legs", lb6: "legs", lb7: "legs",
   // Upper B
   ub1: "chest", ub2: "back", ub3: "back", ub4: "back", ub5: "shoulders",
   ub6: "shoulders", ub7: "chest", ub8: "chest", ub9: "back", ub10: "shoulders",
   ub11: "arms", ub12: "arms", ub13: "arms", ub14: "back",
-  ub15: "shoulders", ub16: "shoulders", ub17: "shoulders",
+  ub15: "cuff", ub16: "cuff", ub17: "cuff",
   // Grip, neck & abs
   g1: "core", g2: "grip", g3: "grip", g4: "grip", g5: "grip", g6: "back",
   g7: "grip", g8: "core", g9: "core", g10: "neck", g11: "neck",
@@ -1064,13 +1066,6 @@ function pinCal(ex) {
   return ok(all[ex.id]) ? all[ex.id] : null;
 }
 
-/* Lifts the programme has taken out of a session. Each is benched once on
-   the device rather than deleted, so its history keeps its own session
-   and it can be restored from Edit exercises. Internal rotation left grip
-   day on 20 Oct 2026, replaced by the rotator cuff block on both upper
-   days, which starts fresh because the rep range and stack changed. */
-const MOVED_OUT = ["g5"];
-
 /** Every set entry for this lift, its twin's included. */
 const liftSets = (exId, log) =>
   (log || state.log).filter((l) => l.type === "set" && (l.exId === exId || l.exId === TWIN[exId]));
@@ -1098,6 +1093,17 @@ function entryWork(ex, l) {
   let w = loadKg(ex, l.load) * sum(l.reps);
   (l.drops || []).forEach((d) => { if (d) w += loadKg(ex, d.load) * d.reps; });
   return w;
+}
+
+/** What one set is meant to reach today: last time's reps at this weight
+ *  for that set, counting any reps it finished lighter, since a dropped set
+ *  comes back as the whole set to attempt. Without a last time at this
+ *  weight it is the bottom of the range, which is what a new weight aims
+ *  for. Sets beyond last time's count fall back the same way. */
+function setGoal(ex, last, i) {
+  if (!last || last.reps[i] === undefined) return ex.lo;
+  const d = last.drops && last.drops[i];
+  return last.reps[i] + (d ? d.reps : 0);
 }
 
 /** Reps as written in the log and in Obsidian: 8,6+2@30kg,8@30kg. */
@@ -1342,7 +1348,7 @@ const STORE_KEY = "gym:tracker:v2";
 const LEGACY_KEY = "gym:tracker:v1";
 const DELOAD_PCT = 0.3;
 const URI_BUDGET = 7000; // conservative ceiling for a custom-protocol URL
-const VERSION = "2.10 \u00b7 drop sets, rotator cuff";
+const VERSION = "2.10.1 \u00b7 drop set button, grip rotation back";
 
 const C = {
   muted: "var(--muted)", accent: "var(--accent)", pb: "var(--pb)",
@@ -1821,13 +1827,16 @@ function load() {
     settings: Object.assign({ vault: "", filepath: "Gym.md", sex: "male", dbPer: "each", addOnKg: 1.125, lastBackupAt: null, theme: "system", whoopUrl: "", whoopKey: "", whoopLastFetch: null, whoopError: null }, (saved && saved.settings) || {}),
   };
 
-  const moved = Object.assign({}, state.plan.moved || {});
-  MOVED_OUT.forEach((id) => {
-    if (moved[id]) return;
-    moved[id] = today();
-    state.plan.off = Object.assign({}, state.plan.off, { [id]: (state.plan.off || {})[id] || today() });
-  });
-  state.plan.moved = moved;
+  /* Grip day's internal rotation was benched on every device by 2.10
+     (20 Oct 2026) and asked back the next day, alongside the rotator cuff
+     block on the upper days. Undo that once, and only where the bench is
+     still the one 2.10 made: a bench set by hand on another date stays. */
+  const pl = state.plan;
+  if (pl.moved && pl.moved.g5 && pl.moved.g5 !== "back") {
+    const off = Object.assign({}, pl.off);
+    if (off.g5 === pl.moved.g5) delete off.g5;
+    state.plan = Object.assign({}, pl, { off: off, moved: Object.assign({}, pl.moved, { g5: "back" }) });
+  }
 
   /* Bring twinned lifts into step, which matters once: before the twin
      existed they were logged separately and can disagree. The weight comes
@@ -2280,10 +2289,13 @@ function renderSessionEdit(s) {
 /** The words for a custom exercise's own strength-standard ratio, named to
  *  its group's actual anchor lift so the number means something concrete
  *  rather than an abstract multiplier. Shared between the form's initial
- *  render (default group is "back") and updateAddExerciseVisibility(),
- *  which re-runs it whenever the group changes, so the two can never say
- *  different things about the same field. */
+ *  render and updateAddExerciseVisibility(), which re-runs it whenever the
+ *  group changes, so the two can never say different things about the same
+ *  field. A supporting group (core, grip, neck, cuff) has no benchmark and
+ *  gets no words: the form's default group follows the session, and on
+ *  grip day that is one of these, which used to crash Edit exercises. */
 function stdHintText(mg) {
+  if (!MG[mg]) return "";
   /* Plain text, not HTML: used both inside a string-concatenated markup
      block (where the call site escapes it) and assigned straight to a
      textContent (where escaping would show literal &amp; instead of &). */
@@ -2364,7 +2376,7 @@ function renderAddExercise(sid) {
     '<span>Per-dumbbell weight<span style="color:var(--muted)"> · the number you log is one dumbbell, not the pair</span></span>' +
     "</label></div>" +
 
-    '<div id="neStdWrap">' +
+    '<div id="neStdWrap"' + (MG_ORDER.indexOf(defaultMg) >= 0 ? "" : " hidden") + ">" +
     '<label class="check">' +
     '<input type="checkbox" id="neStdOn" onchange="updateAddExerciseVisibility()">' +
     "<span>Count toward the Strength standard</span>" +
@@ -2488,9 +2500,10 @@ function renderExercise() {
 
   if (!draft) {
     const src = lastAtTarget || lastSet;
+    // A set that was dropped last time starts from its whole length.
     const reps = Array(ex.sets).fill(ex.lo).map((d, i) => {
-      if (!src) return d;
-      return src.reps[i] !== undefined ? src.reps[i] : (src.reps[src.reps.length - 1] !== undefined ? src.reps[src.reps.length - 1] : d);
+      if (!src || !src.reps.length) return d;
+      return setGoal(ex, src, src.reps[i] !== undefined ? i : src.reps.length - 1);
     });
     draft = { reps: reps, drops: [], rir: lastSet && lastSet.rir != null ? lastSet.rir : 1, load: target == null ? "" : String(target), formReset: false, note: "" };
   }
@@ -2568,15 +2581,20 @@ function renderExercise() {
     const label = delta === null
       ? (r >= ex.hi ? "top" : r >= ex.lo ? "in range" : "under")
       : delta === 0 ? "= " + prev : (delta > 0 ? "+" : "") + delta;
-    const canDrop = ex.unit !== "bw" && valid;
+    /* Offered on every weighted set rather than only once a set looks short:
+       the app cannot yet tell what a given set was meant to reach, so it
+       does not guess. Decided 21 Oct 2026; revisit if a per-set
+       target is ever worked out. */
     const d = draft.drops[i];
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (d ? 4 : 8) + 'px">' +
-      '<span style="font-size:14px;color:var(--muted);width:62px">Set ' + (i + 1) +
-      (canDrop && !d ? '<br><button class="btn-mini" style="margin-top:4px;padding:3px 8px;font-size:11px" onclick="toggleDrop(' + i + ')">Drop</button>' : "") +
-      "</span>" +
+    const offer = !d && ex.unit !== "bw" && valid && effLoad > 0;
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (d || offer ? 4 : 8) + 'px">' +
+      '<span style="font-size:14px;color:var(--muted);width:62px">Set ' + (i + 1) + "</span>" +
       stepper("rep" + i, r, 0, ex.repUnit === "sec" ? 180 : 60, true) +
       '<span id="delta' + i + '" style="width:62px;text-align:right;font-size:13px;color:' + tone + '">' + esc(label) + "</span>" +
       "</div>";
+    if (offer) {
+      h += '<div class="drop-offer"><button class="btn-mini" onclick="toggleDrop(' + i + ')">Drop set</button></div>';
+    }
     if (d) {
       const unitLabel = ex.repUnit === "sec" ? "sec" : "reps";
       h += '<div class="drop-row">' +
@@ -3081,7 +3099,7 @@ function fillReps(n) { draft.reps = draft.reps.map(() => n); render(); }
 window.fillReps = fillReps;
 
 /** Start or remove a drop on one set. It starts about a quarter lighter,
- *  for the reps still missing from the top of the range. */
+ *  for the reps the set was still short of. */
 function toggleDrop(i) {
   const ex = BY_ID[view.exId];
   if (draft.drops[i]) {
@@ -3096,7 +3114,9 @@ function toggleDrop(i) {
   if (!(main > 0)) return;
   const inc = ex.inc || 1;
   const load = Math.min(Math.max(inc, roundToInc(main * 0.75, inc)), Math.max(inc, main - inc));
-  draft.drops[i] = { load: Number(load.toFixed(2)), reps: Math.max(1, ex.hi - draft.reps[i]) };
+  const sets = liftSets(ex.id).sort((a, b) => b.ts - a.ts);
+  const goal = setGoal(ex, sets.find((l) => l.load === main) || null, i);
+  draft.drops[i] = { load: Number(load.toFixed(2)), reps: Math.max(1, goal - draft.reps[i]) };
   render();
 }
 window.toggleDrop = toggleDrop;
