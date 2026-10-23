@@ -166,10 +166,12 @@ Rotimi said on 17 Sep 2026 that he intends to add all three occasionally
 for benchmarking, which would move legs, chest and shoulders off
 self-reported crowdsourced tables and onto the strongest evidence available.
 
-**There is a gap in the way of that, and it is the next thing to fix here.**
-The Add-exercise form can only offer a hand-typed ratio to the group anchor.
-It has no way to say "this IS the anchor lift, score it directly", which is
-exactly what these three need. Adding any of them today would mean typing a
-ratio of 1.00 and hoping, which works but reads as a coincidence rather than
-as the point. The form should offer the anchor table by name when the chosen
-muscle group's anchor is not already in the programme.
+**The gap in the way of that is CLOSED (23 Oct 2026, v2.10.2).** An added
+weighted lift now scores against a published table about itself, found from
+its name ("Back squat", "Bench press", "Overhead press", "DB hammer curl" and
+so on) when it is filed under that table's own group, or chosen by hand in
+Edit exercises, where it can also be switched off. Matching is deliberately
+narrow: it never offers a neighbouring lift's table, since a near miss is
+the invented-ratio problem by another route. A DB hammer curl table
+(Strength Level, 198,427 qualifying results) was added for the first lift
+that needed it.
